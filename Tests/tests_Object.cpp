@@ -17,13 +17,16 @@ class BasicFoo : public Object
     KUBE_MAKE_SIGNAL(signalIncrement, int &)
     KUBE_MAKE_SIGNAL(signalSet, int &, int)
 
-    int incrementValue(int &value) { return ++value; }
-    int setValue(int &value, int tmp) { return value = tmp; }
-
     KUBE_REGISTER(BasicFoo,
         KUBE_REGISTER_PROPERTY_COPY(int, data)
         KUBE_REGISTER_SIGNAL(signal)
+        KUBE_REGISTER_SIGNAL(signalIncrement)
+        KUBE_REGISTER_SIGNAL(signalSet)
     )
+
+public:
+    int incrementValue(int &value) { return ++value; }
+    int setValue(int &value, int tmp) { return value = tmp; }
 };
 
 TEST(Object, FunctorSlots)
@@ -34,7 +37,7 @@ TEST(Object, FunctorSlots)
 
     BasicFoo foo, foo2;
     int x = 0;
-    foo.connect("data"_hash, [&x] {
+    foo.connect("dataChanged"_hash, [&x] {
         ++x;
     });
     foo2.connect<&BasicFoo::signal>([&foo](int x) {
@@ -66,4 +69,42 @@ TEST(Object, MemberSlots)
     ASSERT_EQ(x, 42);
     foo2.emit<&BasicFoo::signalSet>(x, 24); // Using foo2 instead of foo
     ASSERT_EQ(x, 42);
+}
+
+TEST(Object, Disconnection)
+{
+    Meta::Resolver::Clear();
+    RegisterMetadata();
+    BasicFoo::RegisterMetadata();
+
+    BasicFoo foo;
+    int x = 0;
+    auto conn = foo.connect<&BasicFoo::dataChanged>([&x]{ ++x; });
+    foo.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 1);
+    foo.disconnect<&BasicFoo::dataChanged>(conn);
+    foo.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 1);
+}
+
+TEST(Object, MemberDisconnection)
+{
+    Meta::Resolver::Clear();
+    RegisterMetadata();
+    BasicFoo::RegisterMetadata();
+
+    BasicFoo foo, foo2;
+    int x = 0;
+    auto conn = foo.connect<&BasicFoo::dataChanged>(foo2, &BasicFoo::dataChanged);
+    auto conn2 = foo2.connect<&BasicFoo::dataChanged>([&x]{ ++x; });
+    foo.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 1);
+    foo.disconnect<&BasicFoo::dataChanged>(conn);
+    foo.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 1);
+    foo2.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 2);
+    foo2.disconnect<&BasicFoo::dataChanged>(conn2);
+    foo2.emit<&BasicFoo::dataChanged>();
+    ASSERT_EQ(x, 2);
 }

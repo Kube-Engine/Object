@@ -3,6 +3,17 @@
  * @ Description: Interpreter Object interface
  */
 
+inline kF::Object::~Object(void) noexcept
+{
+    if (!_connectionTable)
+        return;
+    auto &slotTable = *_connectionTable->slotTable;
+    for (auto &owned : _connectionTable->ownedSlots)
+        slotTable.remove(owned);
+    for (auto &registered : _connectionTable->registeredSlots)
+        slotTable.remove(registered.second);
+}
+
 inline kF::Var kF::Object::getVar(const HashedName name) const
 {
     if (auto data = getMetaType().findData(name); !data)
@@ -43,7 +54,29 @@ inline kF::Var kF::Object::invoke(const Meta::Function metaFunc, Args &&...args)
     return metaFunc.invoke(getTypeHandle(), std::forward<Args>(args)...);
 }
 
-template<typename Receiver, typename Slot>
+template<kF::Object::IsEnsureConnection EnsureConnectionTable>
+inline kF::Meta::SlotTable &kF::Object::getDefaultSlotTable(void) noexcept_ndebug
+{
+    if constexpr (EnsureConnectionTable == IsEnsureConnection::Yes)
+        ensureConnectionTable();
+    return *_connectionTable->slotTable;
+}
+
+template<kF::Object::IsEnsureConnection EnsureConnectionTable>
+inline void kF::Object::setDefaultSlotTable(Meta::SlotTable &slotTable) noexcept_ndebug
+{
+    if constexpr (EnsureConnectionTable == IsEnsureConnection::Yes)
+        ensureConnectionTable();
+    _connectionTable->slotTable = &slotTable;
+}
+
+inline void kF::Object::ensureConnectionTable(void) noexcept_ndebug
+{
+    if (!_connectionTable) [[unlikely]]
+        _connectionTable = std::make_unique<ConnectionTable>();
+}
+
+template<kF::Object::IsEnsureConnection EnsureConnectionTable, typename Receiver, typename Slot>
 inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, Slot &&slot)
     noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
 {
@@ -54,10 +87,14 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
         static_assert(std::is_const_v<Receiver> == Decomposer::IsConst, "You tried to connect a volatile member slot with a constant receiver");
     }
 
+    kFAssert(signal.operator bool(),
+        throw std::logic_error("Object::connect: Can't establish connection to invalid signal"));
+
     auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot)) };
 
     handle = slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot));
-    ensureConnectionTable();
+    if constexpr (EnsureConnectionTable == IsEnsureConnection::Yes)
+        ensureConnectionTable();
     _connectionTable->registeredSlots.emplace_back(signal, handle);
     if constexpr (std::is_base_of_v<Object, Receiver>) {
         if (this != receiver) {
@@ -68,12 +105,50 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     return handle;
 }
 
-template<typename ...Args>
+inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle)
+{
+    auto it = _connectionTable->registeredSlots.begin();
+    const auto end = _connectionTable->registeredSlots.end();
+
+    while (it != end) {
+        if (it->first != signal || it->second != handle) [[likely]] {
+            ++it;
+            continue;
+        }
+        _connectionTable->registeredSlots.erase(it);
+        slotTable.remove(handle);
+        return;
+    }
+    throw std::logic_error("Object::disconnect: Slot not found");
+}
+
+template<typename Receiver>
+inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, const ConnectionHandle handle)
+{
+    disconnect(slotTable, signal, handle);
+    if constexpr (std::is_base_of_v<Object, Receiver>) {
+        auto it = reinterpret_cast<std::remove_cvref_t<Receiver *>>(receiver)->_connectionTable.ownedSlots.begin();
+        const auto end = reinterpret_cast<std::remove_cvref_t<Receiver *>>(receiver)->_connectionTable.ownedSlots.end();
+
+        while (it != end) {
+            if (*it != handle) [[likely]] {
+                ++it;
+                continue;
+            }
+            _connectionTable->registeredSlots.erase(it);
+            return;
+        }
+        throw std::logic_error("Object::disconnect: Slot not found in receiver");
+    }
+}
+
+template<kF::Object::IsEnsureConnection EnsureConnectionTable, typename ...Args>
 inline void kF::Object::emit(Meta::SlotTable &slotTable, const Meta::Signal signal, Args &&...args)
 {
     kFAssert(signal,
         throw std::logic_error("Object::emit: Unknown signal"));
-    ensureConnectionTable();
+    if constexpr (EnsureConnectionTable == IsEnsureConnection::Yes)
+        ensureConnectionTable();
     Var arguments[sizeof...(Args)] { Var::Assign(std::forward<Args>(args))... };
     const auto it = std::remove_if(_connectionTable->registeredSlots.begin(), _connectionTable->registeredSlots.end(),
         [&slotTable, signal, &arguments](auto &pair) -> bool {
@@ -85,10 +160,4 @@ inline void kF::Object::emit(Meta::SlotTable &slotTable, const Meta::Signal sign
     );
     if (it != _connectionTable->registeredSlots.end()) [[unlikely]]
         _connectionTable->registeredSlots.erase(it, _connectionTable->registeredSlots.end());
-}
-
-inline void kF::Object::ensureConnectionTable(void) noexcept_ndebug
-{
-    if (!_connectionTable) [[unlikely]]
-        _connectionTable = std::make_unique<ConnectionTable>();
 }

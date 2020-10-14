@@ -7,6 +7,8 @@
 
 #include <functional>
 
+#include "MacroUtils.hpp"
+
 /** @brief Generate a property with given parameters (used internally) */
 #define KUBE_MAKE_PROPERTY_IMPL(SCOPE, GETTER, SETTER, Type, name, ...) \
 SCOPE: \
@@ -60,7 +62,7 @@ private: \
 /** @brief Declare a signal */
 #define KUBE_MAKE_SIGNAL_IMPL(SCOPE, name, ...) \
 SCOPE: \
-    void name(__VA_ARGS__) {}
+    void name(NAME_EACH(__VA_ARGS__)) { emit<&_MetaType::name>(FORWARD_NAME_EACH(__VA_ARGS__)); }
 
 /** @brief Declare a public signal */
 #define KUBE_MAKE_SIGNAL(name, ...) KUBE_MAKE_SIGNAL_IMPL(public, name, __VA_ARGS__)
