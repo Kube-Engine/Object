@@ -35,18 +35,21 @@ private:
 
 /** @brief Use these macros to generate a new property and register it to a meta type
  *  The property can have several tags used to generate an optimal getter and setter.
- *      - COPY: the property setter will take a constant reference
- *      - MOVE: the property setter will take a rvalue reference
- *      - REF: the property also has a non-const getter that will not trigger the property signal on change
+ *      - COPY: the property will have a copy setter
+ *      - MOVE: the property will have a move setter
+ *      - REF: the property will have a volatile getter that will not trigger the property signal on change
+ *      - READONLY: the property will have a protected setter not registered to the meta type
  *
  *  @param PropertyType is the property type
  *  @param name is the name of the property
  *  @param ... all variadic arguments are used to initialize the property
  */
-#define K_PROPERTY_COPY(PropertyType, name, ...)     PROPERTY_COPY(PropertyType, name, __VA_ARGS__)
-#define K_PROPERTY_COPY_REF(PropertyType, name, ...) PROPERTY_COPY_REF(PropertyType, name, __VA_ARGS__)
-#define K_PROPERTY_MOVE(PropertyType, name, ...)     PROPERTY_COPY_MOVE(PropertyType, name, __VA_ARGS__)
-#define K_PROPERTY_MOVE_REF(PropertyType, name, ...) PROPERTY_COPY_MOVE_REF(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_COPY(PropertyType, name, ...)                PROPERTY_COPY(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_COPY_READONLY(PropertyType, name, ...)       PROPERTY_COPY_READONLY(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_COPY_REF(PropertyType, name, ...)            PROPERTY_COPY_REF(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_MOVE(PropertyType, name, ...)                PROPERTY_MOVE(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_MOVE_READONLY(PropertyType, name, ...)       PROPERTY_MOVE_READONLY(PropertyType, name, __VA_ARGS__)
+#define K_PROPERTY_MOVE_REF(PropertyType, name, ...)            PROPERTY_MOVE_REF(PropertyType, name, __VA_ARGS__)
 
 /** @brief Use this macro to register a meta property using custom getter and setter
  *  This macro will NOT generate NOR register a SIGNAL, the user is in charge of doing it manually

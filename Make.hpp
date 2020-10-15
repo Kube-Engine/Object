@@ -25,17 +25,35 @@ SCOPE: \
 private: \
     KUBE_MAKE_VARIABLE(Type, name) \
 
+/** @brief Generate a readonly property with given parameters (used internally) */
+#define KUBE_MAKE_PROPERTY_READONLY_IMPL(SCOPE, GETTER, SETTER, Type, name, ...) \
+protected: \
+    KUBE_MAKE_##SETTER(Type, name) \
+SCOPE: \
+    KUBE_MAKE_##GETTER(Type, name) \
+    KUBE_MAKE_SIGNAL_IMPL(SCOPE, name##Changed) \
+private: \
+    KUBE_MAKE_VARIABLE(Type, name) \
+
 /** @brief Generate a property with a move setter */
-#define KUBE_MAKE_PROPERTY_COPY(Type, name, ...) KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_COPY, Type, name, __VA_ARGS__)
+#define KUBE_MAKE_PROPERTY_COPY(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_COPY, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a volatile reference getter and a move setter */
-#define KUBE_MAKE_PROPERTY_COPY_REF(Type, name, ...) KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_COPY, Type, name, __VA_ARGS__)
+#define KUBE_MAKE_PROPERTY_COPY_REF(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_COPY, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a move setter */
-#define KUBE_MAKE_PROPERTY_MOVE(Type, name, ...) KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_MOVE, Type, name, __VA_ARGS__)
+#define KUBE_MAKE_PROPERTY_MOVE(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_MOVE, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a volatile reference getter and a move setter */
-#define KUBE_MAKE_PROPERTY_MOVE_REF(Type, name, ...) KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_MOVE, Type, name, __VA_ARGS__)
+#define KUBE_MAKE_PROPERTY_MOVE_REF(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_MOVE, Type, name, __VA_ARGS__)
+
+/** @brief Generate a readonly property with a move setter */
+#define KUBE_MAKE_PROPERTY_MOVE_READONLY(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_READONLY_IMPL(public, GETTER_REF, SETTER_MOVE, Type, name, __VA_ARGS__)
 
 /** @brief Const reference getter for any type */
 #define KUBE_MAKE_GETTER(Type, name) \

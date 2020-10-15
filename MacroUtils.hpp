@@ -9,7 +9,6 @@
 #define _CONCATENATE(arg1, arg2) _CONCATENATE1(arg1, arg2) // Call the _CONCATENATE1 to expend potential macro arguments
 #define _CONCATENATE1(arg1, arg2) arg1##arg2
 #define _CONCATENATE_SECOND(arg1, arg2) arg1##arg2 // Second concatenate macro used because the preprocessor expand use the same macro in a recursive expension
-// #define _CONCATENATE(arg1, arg2) arg1##arg2
 #define _CONCATENATE5(_0, _1, _2, _3, _4) _0 ## _1 ## _2 ## _3 ## _4
 
 // Check if a variadic arguments of 16 or less has a coma (one zero arguments)

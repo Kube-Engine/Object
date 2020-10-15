@@ -21,21 +21,35 @@
 
 /** @brief Register a copy only property */
 #define KUBE_REGISTER_PROPERTY_COPY(PropertyType, name, ...) \
-    .data< \
+    KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, \
         static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         static_cast<bool(_MetaType::*)(const PropertyType &)>(&_MetaType::name) \
-    >(kF::Hash(#name)) \
+    ) \
     KUBE_REGISTER_SIGNAL(name##Changed)
-#define KUBE_REGISTER_PROPERTY_COPY_REF(PropertyType, name, ...) KUBE_REGISTER_PROPERTY_COPY(PropertyType, name, __VA_ARGS__)
+#define KUBE_REGISTER_PROPERTY_COPY_REF(PropertyType, name, ...) \
+    KUBE_REGISTER_PROPERTY_COPY(PropertyType, name, __VA_ARGS__)
+
+/** @brief Register a read and copy only property */
+#define KUBE_REGISTER_PROPERTY_COPY_READONLY(PropertyType, name, ...) \
+    KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, \
+        static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
+        nullptr \
+    ) \
+    KUBE_REGISTER_SIGNAL(name##Changed)
 
 /** @brief Register a move only property */
 #define KUBE_REGISTER_PROPERTY_MOVE(PropertyType, name, ...) \
-    .data< \
+    KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, \
         static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         static_cast<bool(_MetaType::*)(PropertyType &&)>(&_MetaType::name) \
-    >(kF::Hash(#name)) \
+    ) \
     KUBE_REGISTER_SIGNAL(name##Changed)
-#define KUBE_REGISTER_PROPERTY_MOVE_REF(PropertyType, name, ...) KUBE_REGISTER_PROPERTY_MOVE(PropertyType, name, __VA_ARGS__)
+#define KUBE_REGISTER_PROPERTY_MOVE_REF(PropertyType, name, ...) \
+    KUBE_REGISTER_PROPERTY_MOVE(PropertyType, name, __VA_ARGS__)
+
+/** @brief Register a read and move only property */
+#define KUBE_REGISTER_PROPERTY_MOVE_READONLY(PropertyType, name, ...) \
+    KUBE_REGISTER_PROPERTY_COPY_READONLY(PropertyType, name, __VA_ARGS__)
 
 /** @brief Register a custom property using getter and setter */
 #define KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, getter, setter) \
