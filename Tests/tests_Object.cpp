@@ -12,16 +12,11 @@ using namespace kF::Literal;
 
 class BasicFoo : public Object
 {
-    KUBE_MAKE_PROPERTY_COPY(int, data, 0)
-    KUBE_MAKE_SIGNAL(signal, int)
-    KUBE_MAKE_SIGNAL(signalIncrement, int &)
-    KUBE_MAKE_SIGNAL(signalSet, int &, int)
-
-    KUBE_REGISTER(BasicFoo,
-        KUBE_REGISTER_PROPERTY_COPY(int, data)
-        KUBE_REGISTER_SIGNAL(signal)
-        KUBE_REGISTER_SIGNAL(signalIncrement)
-        KUBE_REGISTER_SIGNAL(signalSet)
+    K_OBJECT(BasicFoo,
+        K_PROPERTY_COPY(int, data, 0),
+        K_SIGNAL(signal, int),
+        K_SIGNAL(signalIncrement, int &),
+        K_SIGNAL(signalSet, int &, int)
     )
 
 public:

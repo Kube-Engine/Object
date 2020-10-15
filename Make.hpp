@@ -1,6 +1,6 @@
 /**
  * @ Author: Matthieu Moinvaziri
- * @ Description:
+ * @ Description: Code generation helpers
  */
 
 #pragma once
@@ -8,6 +8,13 @@
 #include <functional>
 
 #include "MacroUtils.hpp"
+
+/** @brief Dummy generators, not used */
+#define KUBE_MAKE_BASE(...)
+#define KUBE_MAKE_CONSTRUCTOR(...)
+#define KUBE_MAKE_FUNCTION(...)
+#define KUBE_MAKE_FUNCTION_OVERLOAD(...)
+#define KUBE_MAKE_PROPERTY_CUSTOM(...)
 
 /** @brief Generate a property with given parameters (used internally) */
 #define KUBE_MAKE_PROPERTY_IMPL(SCOPE, GETTER, SETTER, Type, name, ...) \

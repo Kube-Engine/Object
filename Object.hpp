@@ -18,7 +18,7 @@ namespace kF
  *  It can be used to query meta properties or connect / emit meta signals */
 class kF::Object
 {
-    KUBE_REGISTER(Object)
+    K_OBJECT(Object)
 
 public:
     /** @brief Helper to make template instantiation more clear */
