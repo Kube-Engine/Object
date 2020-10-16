@@ -82,7 +82,7 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
 {
     using Decomposer = Meta::Internal::FunctionDecomposerHelper<Slot>;
 
-    if constexpr (!std::is_same_v<Receiver, void> && Decomposer::IsMember) {
+    if constexpr (!std::is_same_v<Receiver, void> && Decomposer::IsMember && !Decomposer::IsFunctor) {
         static_assert(std::is_same_v<Receiver, typename Decomposer::ClassType>, "You tried to connect receiver to a non-receiver member function");
         static_assert(std::is_const_v<Receiver> == Decomposer::IsConst, "You tried to connect a volatile member slot with a constant receiver");
     }

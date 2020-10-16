@@ -17,43 +17,38 @@
 #define KUBE_MAKE_PROPERTY_CUSTOM(...)
 
 /** @brief Generate a property with given parameters (used internally) */
-#define KUBE_MAKE_PROPERTY_IMPL(SCOPE, GETTER, SETTER, Type, name, ...) \
-SCOPE: \
-    KUBE_MAKE_##GETTER(Type, name) \
-    KUBE_MAKE_##SETTER(Type, name) \
-    KUBE_MAKE_SIGNAL_IMPL(SCOPE, name##Changed) \
+#define KUBE_MAKE_PROPERTY_IMPL(GETTER_SCOPE, GETTER_TYPE, SETTER_SCOPE, SETTER_TYPE, SIGNAL_SCOPE, Type, name, ...) \
+    KUBE_MAKE_SIGNAL_IMPL(SIGNAL_SCOPE, name##Changed) \
+GETTER_SCOPE: \
+    KUBE_MAKE_##GETTER_TYPE(Type, name) \
+SETTER_SCOPE: \
+    KUBE_MAKE_##SETTER_TYPE(Type, name) \
 private: \
-    KUBE_MAKE_VARIABLE(Type, name) \
-
-/** @brief Generate a readonly property with given parameters (used internally) */
-#define KUBE_MAKE_PROPERTY_READONLY_IMPL(SCOPE, GETTER, SETTER, Type, name, ...) \
-protected: \
-    KUBE_MAKE_##SETTER(Type, name) \
-SCOPE: \
-    KUBE_MAKE_##GETTER(Type, name) \
-    KUBE_MAKE_SIGNAL_IMPL(SCOPE, name##Changed) \
-private: \
-    KUBE_MAKE_VARIABLE(Type, name) \
+    KUBE_MAKE_VARIABLE(Type, name, __VA_ARGS__) \
 
 /** @brief Generate a property with a move setter */
 #define KUBE_MAKE_PROPERTY_COPY(Type, name, ...) \
-    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_COPY, Type, name, __VA_ARGS__)
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, public, SETTER_COPY, public, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a volatile reference getter and a move setter */
 #define KUBE_MAKE_PROPERTY_COPY_REF(Type, name, ...) \
-    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_COPY, Type, name, __VA_ARGS__)
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, public, SETTER_COPY, public, Type, name, __VA_ARGS__)
+
+/** @brief Generate a readonly property with a copy setter */
+#define KUBE_MAKE_PROPERTY_COPY_READONLY(Type, name, ...) \
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, private, SETTER_COPY, public, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a move setter */
 #define KUBE_MAKE_PROPERTY_MOVE(Type, name, ...) \
-    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, SETTER_MOVE, Type, name, __VA_ARGS__)
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, public, SETTER_MOVE, public, Type, name, __VA_ARGS__)
 
 /** @brief Generate a property with a volatile reference getter and a move setter */
 #define KUBE_MAKE_PROPERTY_MOVE_REF(Type, name, ...) \
-    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, SETTER_MOVE, Type, name, __VA_ARGS__)
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER_REF, public, SETTER_MOVE, public, Type, name, __VA_ARGS__)
 
 /** @brief Generate a readonly property with a move setter */
 #define KUBE_MAKE_PROPERTY_MOVE_READONLY(Type, name, ...) \
-    KUBE_MAKE_PROPERTY_READONLY_IMPL(public, GETTER_REF, SETTER_MOVE, Type, name, __VA_ARGS__)
+    KUBE_MAKE_PROPERTY_IMPL(public, GETTER, private, SETTER_MOVE, public, Type, name, __VA_ARGS__)
 
 /** @brief Const reference getter for any type */
 #define KUBE_MAKE_GETTER(Type, name) \
@@ -84,7 +79,7 @@ private: \
         return true; \
     }
 
-/** @brief Declare a signal */
+/** @brief Declare a signal (used internal) */
 #define KUBE_MAKE_SIGNAL_IMPL(SCOPE, name, ...) \
 SCOPE: \
     void name(NAME_EACH(__VA_ARGS__)) { emit<&_MetaType::name>(FORWARD_NAME_EACH(__VA_ARGS__)); }

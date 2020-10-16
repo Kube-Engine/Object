@@ -103,3 +103,55 @@ TEST(Object, MemberDisconnection)
     foo2.emit<&BasicFoo::dataChanged>();
     ASSERT_EQ(x, 2);
 }
+
+class AdvancedFoo : public BasicFoo
+{
+    K_OBJECT(AdvancedFoo,
+        K_BASE(BasicFoo),
+        K_PROPERTY_COPY_READONLY(int, readonlyCopyInt, 42),
+        K_SIGNAL(newReadonlyCopyInt, int),
+        K_PROPERTY_MOVE_REF(std::vector<int>, refVectorInt)
+    )
+
+public:
+    AdvancedFoo(void)
+    {
+        connect<&AdvancedFoo::newReadonlyCopyInt>(*this,
+            static_cast<bool(AdvancedFoo::*)(const int &)>(&AdvancedFoo::readonlyCopyInt)
+        );
+        connect<&AdvancedFoo::refVectorIntChanged>(*this, [this]() {
+            if (!refVectorInt().empty())
+                readonlyCopyInt(refVectorInt().back());
+        });
+    }
+};
+
+TEST(Object, AdvancedFoo)
+{
+    AdvancedFoo::RegisterMetadata();
+    AdvancedFoo foo;
+    int trigger = 0;
+
+    // Base
+    foo.setVar("data"_hash, 123);
+    ASSERT_EQ(foo.data(), 123);
+
+    // Slot not matching signal
+    foo.connect<&AdvancedFoo::newReadonlyCopyInt>([&trigger] { ++trigger; });
+
+    // Avanced connection tricks
+    ASSERT_EQ(foo.readonlyCopyInt(), 42);
+    foo.newReadonlyCopyInt(24);
+    ASSERT_EQ(trigger, 1);
+    ASSERT_EQ(foo.readonlyCopyInt(), 24);
+    foo.refVectorInt(std::vector<int>(1, 21));
+    ASSERT_EQ(foo.readonlyCopyInt(), 21);
+    foo.refVectorInt().emplace_back(24);
+    ASSERT_EQ(foo.readonlyCopyInt(), 21);
+    foo.refVectorIntChanged();
+    foo.refVectorInt().clear();
+    ASSERT_EQ(foo.readonlyCopyInt(), 24);
+    foo.refVectorIntChanged();
+    ASSERT_EQ(foo.readonlyCopyInt(), 24);
+    ASSERT_EQ(trigger, 1);
+}
