@@ -52,7 +52,7 @@ private:
 #define K_PROPERTY_MOVE_REF(PropertyType, name, ...)            PROPERTY_MOVE_REF(PropertyType, name, __VA_ARGS__)
 
 /** @brief Use this macro to register a meta property using custom getter and setter
- *  This macro will NOT generate NOR register a SIGNAL, the user is in charge of doing it manually
+ *  This macro will generate and register a SIGNAL called 'name##Changed', the user is in charge of emiting it in setter
  *
  *  @param PropertyType is the property type
  *  @param name is the property name
@@ -60,6 +60,17 @@ private:
  *  @param setter is the property setter pointer
  */
 #define K_PROPERTY_CUSTOM(PropertyType, name, getter, setter) PROPERTY_CUSTOM(PropertyType, name, getter, setter)
+#define K_PROPERTY_CUSTOM_READONLY(PropertyType, name, getter) PROPERTY_CUSTOM(PropertyType, name, getter, nullptr)
+
+/** @brief Use this macro to register a meta property using custom getter and setter
+ *  This macro will NOT generate NOR register a SIGNAL, the user is in charge of doing it manually
+ *
+ *  @param PropertyType is the property type
+ *  @param name is the property name
+ *  @param getter is the property getter pointer
+ *  @param setter is the property setter pointer
+ */
+#define K_PROPERTY_CUSTOM_SIGLESS(PropertyType, name, getter, setter) PROPERTY_CUSTOM(PropertyType, name, getter, setter)
 
 /** @brief Use this macro to generate a new signal and register it to a meta type
  *  @param name is the name of the signal function

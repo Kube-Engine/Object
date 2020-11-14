@@ -7,14 +7,14 @@
 
 #include <functional>
 
-#include "MacroUtils.hpp"
+#include <Kube/Core/MacroUtils.hpp>
 
 /** @brief Dummy generators, not used */
 #define KUBE_MAKE_BASE(...)
 #define KUBE_MAKE_CONSTRUCTOR(...)
 #define KUBE_MAKE_FUNCTION(...)
 #define KUBE_MAKE_FUNCTION_OVERLOAD(...)
-#define KUBE_MAKE_PROPERTY_CUSTOM(...)
+#define KUBE_MAKE_PROPERTY_CUSTOM_SIGLESS(...)
 
 /** @brief Generate a property with given parameters (used internally) */
 #define KUBE_MAKE_PROPERTY_IMPL(GETTER_SCOPE, GETTER_TYPE, SETTER_SCOPE, SETTER_TYPE, SIGNAL_SCOPE, Type, name, ...) \
@@ -49,6 +49,10 @@ private: \
 /** @brief Generate a readonly property with a move setter */
 #define KUBE_MAKE_PROPERTY_MOVE_READONLY(Type, name, ...) \
     KUBE_MAKE_PROPERTY_IMPL(public, GETTER, private, SETTER_MOVE, public, Type, name, __VA_ARGS__)
+
+/** @brief Generate the signal of a custom property */
+#define KUBE_MAKE_PROPERTY_CUSTOM(Type, name, ...) \
+    KUBE_MAKE_SIGNAL(name##Changed)
 
 /** @brief Const reference getter for any type */
 #define KUBE_MAKE_GETTER(Type, name) \

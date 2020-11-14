@@ -31,14 +31,14 @@ public:
     using ConnectionHandle = Meta::SlotTable::OpaqueIndex;
 
     /** @brief Connection table of an object */
-    struct KF_ALIGN_CACHELINE ConnectionTable
+    struct alignas_cacheline ConnectionTable
     {
         Meta::SlotTable *slotTable { &Meta::Signal::GetSlotTable() };
         std::vector<std::pair<Meta::Signal, ConnectionHandle>> registeredSlots;
         std::vector<ConnectionHandle> ownedSlots;
     };
 
-    static_assert(sizeof(ConnectionTable) == Core::Utils::CacheLineSize, "ConnectionTable must be the size of a cacheline");
+    static_assert_fit_cacheline(ConnectionTable);
 
     /** @brief Default constructor (very cheap) */
     Object(void) noexcept = default;

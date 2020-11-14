@@ -5,7 +5,7 @@
 
 #pragma once
 
-#include "MacroUtils.hpp"
+#include <Kube/Core/MacroUtils.hpp>
 
 /** @brief Register a new type (already used by 'KUBE_REGISTER' and 'KUBE_REGISTER_INSTANTIABLE') */
 #define KUBE_REGISTER_TYPE(ClassType, ...) \
