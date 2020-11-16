@@ -6,9 +6,6 @@ set(KubeObjectSources
     ${KubeObjectDir}/Make.hpp
     ${KubeObjectDir}/Reflection.hpp
     ${KubeObjectDir}/Reflection.cpp
-    ${KubeObjectDir}/Object.hpp
-    ${KubeObjectDir}/Object.ipp
-    ${KubeObjectDir}/Object.cpp
 )
 
 add_library(${PROJECT_NAME} ${KubeObjectSources})
