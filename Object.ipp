@@ -1,6 +1,6 @@
 /**
  * @ Author: Matthieu Moinvaziri
- * @ Description: Interpreter Object interface
+ * @ Description: Object
  */
 
 inline kF::Object::~Object(void) noexcept
@@ -18,7 +18,7 @@ inline kF::Var kF::Object::getVar(const HashedName name) const
 {
     if (auto data = getMetaType().findData(name); !data)
         throw std::logic_error("Object::get: Invalid hashed name '" + std::to_string(name) + '\'');
-    else if (auto res = data.get(getTypeHandle()); res)
+    else if (auto res = data.get(this); res)
         return res;
     throw std::logic_error("Object::get: Empty property '" + std::to_string(name) + '\'');
 }
@@ -27,31 +27,30 @@ inline void kF::Object::setVar(const HashedName name, const Var &var)
 {
     if (auto data = getMetaType().findData(name); !data)
         throw std::logic_error("Object::set: Invalid hashed name '" + std::to_string(name) + '\'');
-    else if (!data.set(getTypeHandle(), const_cast<Var &>(var)))
+    else if (!data.set(this, const_cast<Var &>(var)))
         throw std::logic_error("Object::set: Argument type doesn't match type of hashed name '" + std::to_string(name) + '\'');
 }
 
 inline void kF::Object::setVar(const Meta::Data metaData, const Var &var)
 {
-    if (!metaData.set(getTypeHandle(), const_cast<Var &>(var)))
+    if (!metaData.set(this, const_cast<Var &>(var)))
         throw std::logic_error("Object::set: Argument type doesn't match type");
 }
 
 template<typename ...Args>
 inline kF::Var kF::Object::invoke(const HashedName name, Args &&...args)
 {
-    auto handle = getTypeHandle();
-    auto fct = handle.type().findFunction(name);
+    auto fct = getMetaType().findFunction(name);
 
     kFAssert(fct,
         throw std::logic_error("Object::invoke: Invalid hashed name '" + std::to_string(name) + '\''));
-    return fct.invoke(handle, std::forward<Args>(args)...);
+    return fct.invoke(this, std::forward<Args>(args)...);
 }
 
 template<typename ...Args>
 inline kF::Var kF::Object::invoke(const Meta::Function metaFunc, Args &&...args)
 {
-    return metaFunc.invoke(getTypeHandle(), std::forward<Args>(args)...);
+    return metaFunc.invoke(this, std::forward<Args>(args)...);
 }
 
 template<kF::Object::IsEnsureConnection EnsureConnectionTable>
@@ -95,11 +94,11 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     handle = slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot));
     if constexpr (EnsureConnectionTable == IsEnsureConnection::Yes)
         ensureConnectionTable();
-    _connectionTable->registeredSlots.emplace_back(signal, handle);
+    _connectionTable->registeredSlots.push(signal, handle);
     if constexpr (std::is_base_of_v<Object, Receiver>) {
         if (this != receiver) {
             reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureConnectionTable();
-            reinterpret_cast<Object*>(const_cast<void *>(receiver))->_connectionTable->ownedSlots.emplace_back(handle);
+            reinterpret_cast<Object*>(const_cast<void *>(receiver))->_connectionTable->ownedSlots.push(handle);
         }
     }
     return handle;

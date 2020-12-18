@@ -3,16 +3,18 @@ project(KubeObject)
 get_filename_component(KubeObjectDir ${CMAKE_CURRENT_LIST_FILE} PATH)
 
 set(KubeObjectSources
-    ${KubeObjectDir}/Make.hpp
+    ${KubeObjectDir}/Object.hpp
+    ${KubeObjectDir}/Object.ipp
     ${KubeObjectDir}/Reflection.hpp
     ${KubeObjectDir}/Reflection.cpp
+    ${KubeObjectDir}/Register.hpp
+    ${KubeObjectDir}/Make.hpp
 )
 
 add_library(${PROJECT_NAME} ${KubeObjectSources})
 
 target_link_libraries(${PROJECT_NAME}
 PUBLIC
-    KubeCore
     KubeMeta
 )
 

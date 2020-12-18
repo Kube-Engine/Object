@@ -4,6 +4,7 @@ get_filename_component(KubeObjectTestsDir ${CMAKE_CURRENT_LIST_FILE} PATH)
 
 set(KubeObjectTestsSources
     ${KubeObjectTestsDir}/tests_Object.cpp
+    ${KubeObjectTestsDir}/tests_Template.cpp
 )
 
 add_executable(${CMAKE_PROJECT_NAME} ${KubeObjectTestsSources})

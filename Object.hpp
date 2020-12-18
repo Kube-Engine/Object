@@ -1,11 +1,9 @@
 /**
  * @ Author: Matthieu Moinvaziri
- * @ Description: Interpreter Object interface
+ * @ Description: Object
  */
 
 #pragma once
-
-#include <Kube/Core/FlatVector.hpp>
 
 #include "Reflection.hpp"
 
@@ -14,11 +12,11 @@ namespace kF
     class Object;
 }
 
-/** @brief The object class isan abstraction of the meta reflection library on an arbitrary derived class
+/** @brief The object class is an abstraction of the meta reflection library on an arbitrary derived class
  *  It can be used to query meta properties or connect / emit meta signals */
 class kF::Object
 {
-    K_OBJECT(Object)
+    K_ABSTRACT(Object)
 
 public:
     /** @brief Helper to make template instantiation more clear */
@@ -34,14 +32,17 @@ public:
     struct alignas_cacheline ConnectionTable
     {
         Meta::SlotTable *slotTable { &Meta::Signal::GetSlotTable() };
-        std::vector<std::pair<Meta::Signal, ConnectionHandle>> registeredSlots;
-        std::vector<ConnectionHandle> ownedSlots;
+        Core::Vector<std::pair<Meta::Signal, ConnectionHandle>> registeredSlots;
+        Core::Vector<ConnectionHandle> ownedSlots;
     };
 
     static_assert_fit_cacheline(ConnectionTable);
 
     /** @brief Default constructor (very cheap) */
     Object(void) noexcept = default;
+
+    /** @brief Move constructor is disabled since it could break signal / slot behavior */
+    Object(Object &&other) noexcept = delete;
 
     /** @brief Virtual destructor (time vary upon connection count) */
     virtual ~Object(void) noexcept;
@@ -53,7 +54,7 @@ public:
     [[nodiscard]] virtual Var getVar(const HashedName name) const;
 
     /** @brief Get an opaque meta-variable */
-    [[nodiscard]] Var getVar(const Meta::Data metaData) const { return metaData.get(getTypeHandle()); }
+    [[nodiscard]] Var getVar(const Meta::Data metaData) const { return metaData.get(this); }
 
     /** @brief Get a casted meta-variable's reference */
     template<typename As>
