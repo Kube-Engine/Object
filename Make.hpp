@@ -5,6 +5,8 @@
 
 #pragma once
 
+// This header must no be directly included, include 'Reflection' instead
+
 #include <functional>
 
 #include <Kube/Core/MacroUtils.hpp>
@@ -94,7 +96,7 @@ private: \
 
 /** @brief Const reference getter for any type */
 #define KUBE_MAKE_GETTER(PropertyType, name) \
-    [[nodiscard]] const PropertyType &name(void) const noexcept { return _##name; }
+    [[nodiscard]] kF::Internal::ToConstReference<PropertyType> name(void) const noexcept { return _##name; }
 
 /** @brief Either const and volatiele getter for any type */
 #define KUBE_MAKE_GETTER_REF(PropertyType, name) \
@@ -108,7 +110,7 @@ private: \
         if (_##name == value) \
             return false; \
         _##name = std::forward<_PropertyType>(value); \
-        emit<&_MetaType::name##Changed>(); \
+        name##Changed(); \
         return true; \
     }
 
@@ -122,7 +124,7 @@ private: \
 /** @brief Declare a signal (used internal) */
 #define KUBE_MAKE_SIGNAL_IMPL(SCOPE, name, ...) \
 SCOPE: \
-    void name(NAME_EACH(__VA_ARGS__)) { emit<&_MetaType::name>(FORWARD_NAME_EACH(__VA_ARGS__)); }
+    void name(NAME_EACH(__VA_ARGS__)) { emitSignal<&_MetaType::name>(FORWARD_NAME_EACH(__VA_ARGS__)); }
 
 /** @brief Declare a public signal */
 #define KUBE_MAKE_SIGNAL(name, ...) KUBE_MAKE_SIGNAL_IMPL(public, name, __VA_ARGS__)

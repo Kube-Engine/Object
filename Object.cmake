@@ -5,6 +5,9 @@ get_filename_component(KubeObjectDir ${CMAKE_CURRENT_LIST_FILE} PATH)
 set(KubeObjectSources
     ${KubeObjectDir}/Object.hpp
     ${KubeObjectDir}/Object.ipp
+    ${KubeObjectDir}/Tree.hpp
+    ${KubeObjectDir}/Tree.ipp
+    ${KubeObjectDir}/Runtime.hpp
     ${KubeObjectDir}/Reflection.hpp
     ${KubeObjectDir}/Reflection.cpp
     ${KubeObjectDir}/Register.hpp

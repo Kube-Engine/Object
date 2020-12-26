@@ -1,15 +1,15 @@
-project(KubeInterpreterBenchmarks)
+project(KubeObjectBenchmarks)
 
-get_filename_component(KubeInterpreterBenchmarksDir ${CMAKE_CURRENT_LIST_FILE} PATH)
+get_filename_component(KubeObjectBenchmarksDir ${CMAKE_CURRENT_LIST_FILE} PATH)
 
-set(KubeInterpreterBenchmarksSources
-    ${KubeInterpreterBenchmarksDir}/Main.cpp
+set(KubeObjectBenchmarksSources
+    ${KubeObjectBenchmarksDir}/Main.cpp
 )
 
-add_executable(${CMAKE_PROJECT_NAME} ${KubeInterpreterBenchmarksSources})
+add_executable(${CMAKE_PROJECT_NAME} ${KubeObjectBenchmarksSources})
 
 target_link_libraries(${CMAKE_PROJECT_NAME}
 PUBLIC
-    KubeInterpreter
+    KubeObject
     benchmark::benchmark
 )

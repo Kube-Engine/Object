@@ -5,6 +5,8 @@
 
 #pragma once
 
+// This header must no be directly included, include 'Reflection' instead
+
 #include <iostream>
 
 #include <Kube/Core/MacroUtils.hpp>
@@ -14,13 +16,17 @@
 private: \
     using _MetaType = ClassType; \
     ADD_PREFIX_EACH(KUBE_MAKE_, __VA_ARGS__) \
-    static inline kF::Meta::RegisterLater _MetaRegisterer = kF::Meta::RegisterLater::Make<ClassType>( \
-        [] { \
-            std::cout << "Registering type " << #ClassType << std::endl; \
-            KUBE_REGISTER_TYPE(ClassType) \
-                ADD_PREFIX_EACH(KUBE_REGISTER_, __VA_ARGS__) ; \
-        } \
-    );
+    [[nodiscard]] static inline kF::Meta::RegisterLater RegisterMetaData(void) \
+    { \
+        return kF::Meta::RegisterLater::Make<ClassType>( \
+            [] { \
+                std::cout << "Registering type " << #ClassType << std::endl; \
+                KUBE_REGISTER_TYPE(ClassType) \
+                    ADD_PREFIX_EACH(KUBE_REGISTER_, __VA_ARGS__) ; \
+            } \
+        ); \
+    } \
+    static inline kF::Meta::RegisterLater _RegisterLaterInstance { RegisterMetaData() };
 
 /** @brief Register a new type (already used by 'KUBE_REGISTER' and 'KUBE_REGISTER_INSTANTIABLE') */
 #define KUBE_REGISTER_TYPE(ClassType) \
@@ -40,7 +46,7 @@ private: \
 /** @brief Register a constant readable, writable and signalable property */
 #define KUBE_REGISTER_PROPERTY(PropertyType, name, ...) \
     KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, \
-        static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
+        static_cast<kF::Internal::ToConstReference<PropertyType>(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         ConstexprTernary(std::is_copy_assignable_v<PropertyType>, &_MetaType::name<const PropertyType &>, nullptr), \
         ConstexprTernary(std::is_move_assignable_v<PropertyType>, &_MetaType::name<PropertyType &&>, nullptr) \
     )
@@ -48,7 +54,7 @@ private: \
 /** @brief Register a constant readable and writable property (no signal) */
 #define KUBE_REGISTER_PROPERTY_SIGLESS(PropertyType, name, ...) \
     KUBE_REGISTER_PROPERTY_CUSTOM_SIGLESS(PropertyType, name, \
-        static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
+        static_cast<kF::Internal::ToConstReference<PropertyType>(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         ConstexprTernary(std::is_copy_assignable_v<PropertyType>, &_MetaType::name<const PropertyType &>, nullptr), \
         ConstexprTernary(std::is_move_assignable_v<PropertyType>, &_MetaType::name<PropertyType &&>, nullptr) \
     )
@@ -72,7 +78,7 @@ private: \
 /** @brief Register a const readable and signalable property */
 #define KUBE_REGISTER_PROPERTY_GETONLY(PropertyType, name, ...) \
     KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, \
-        static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
+        static_cast<kF::Internal::ToConstReference<PropertyType>(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         nullptr, \
         nullptr \
     )
@@ -80,7 +86,7 @@ private: \
 /** @brief Register a const readable property (no signal) */
 #define KUBE_REGISTER_PROPERTY_GETONLY_SIGLESS(PropertyType, name, ...) \
     KUBE_REGISTER_PROPERTY_CUSTOM_SIGLESS(PropertyType, name, \
-        static_cast<const PropertyType &(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
+        static_cast<kF::Internal::ToConstReference<PropertyType>(_MetaType::*)(void) const noexcept>(&_MetaType::name), \
         nullptr, \
         nullptr \
     )
@@ -197,4 +203,12 @@ namespace kF::Internal
         else
             return GetTemplateVariableNames<VarsTuple, Index + 1>(hash);
     }
+
+    /** @brief Transform a type to a constant reference (add constant tag to pointers) */
+    template<typename Type>
+    using ToConstReference = std::conditional_t<
+        std::is_pointer_v<Type>,
+        const std::add_const_t<Type> &,
+        const Type &
+    >;
 }

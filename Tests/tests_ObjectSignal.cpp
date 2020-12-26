@@ -39,13 +39,13 @@ TEST(Object, FunctorSlots)
     foo2.connect<&BasicFoo::signal>([&foo](int x) {
         foo.data(x);
     });
-    foo2.emit<&BasicFoo::signal>(42);
+    foo2.emitSignal<&BasicFoo::signal>(42);
     ASSERT_EQ(foo.data(), 42);
     ASSERT_EQ(x, 1);
-    foo2.emit("signal"_hash, 24);
+    foo2.emitSignal("signal"_hash, 24);
     ASSERT_EQ(foo.data(), 24);
     ASSERT_EQ(x, 2);
-    foo2.emit<&BasicFoo::signal>(24);
+    emit foo2.signal(24);
     ASSERT_EQ(x, 2);
 }
 
@@ -58,11 +58,11 @@ TEST(Object, MemberSlots)
     int x = 0;
     foo.connect<&BasicFoo::signalIncrement>(foo, &BasicFoo::incrementValue);
     foo.connect<&BasicFoo::signalSet>(foo2, &BasicFoo::setValue);
-    foo.emit("signalIncrement"_hash, x);
+    foo.emitSignal("signalIncrement"_hash, x);
     ASSERT_EQ(x, 1);
-    foo.emit("signalSet"_hash, x, 42);
+    foo.emitSignal("signalSet"_hash, x, 42);
     ASSERT_EQ(x, 42);
-    foo2.emit<&BasicFoo::signalSet>(x, 24); // Using foo2 instead of foo
+    emit foo2.signalSet(x, 24); // Using foo2 instead of foo
     ASSERT_EQ(x, 42);
 }
 
@@ -74,10 +74,10 @@ TEST(Object, Disconnection)
     BasicFoo foo;
     int x = 0;
     auto conn = foo.connect<&BasicFoo::dataChanged>([&x]{ ++x; });
-    foo.emit<&BasicFoo::dataChanged>();
+    foo.emitSignal<&BasicFoo::dataChanged>();
     ASSERT_EQ(x, 1);
     foo.disconnect<&BasicFoo::dataChanged>(conn);
-    foo.emit<&BasicFoo::dataChanged>();
+    emit foo.dataChanged();
     ASSERT_EQ(x, 1);
 }
 
@@ -90,15 +90,15 @@ TEST(Object, MemberDisconnection)
     int x = 0;
     auto conn = foo.connect<&BasicFoo::dataChanged>(foo2, &BasicFoo::dataChanged);
     auto conn2 = foo2.connect<&BasicFoo::dataChanged>([&x]{ ++x; });
-    foo.emit<&BasicFoo::dataChanged>();
+    foo.emitSignal<&BasicFoo::dataChanged>();
     ASSERT_EQ(x, 1);
     foo.disconnect<&BasicFoo::dataChanged>(conn);
-    foo.emit<&BasicFoo::dataChanged>();
+    foo.emitSignal<&BasicFoo::dataChanged>();
     ASSERT_EQ(x, 1);
-    foo2.emit<&BasicFoo::dataChanged>();
+    foo2.emitSignal<&BasicFoo::dataChanged>();
     ASSERT_EQ(x, 2);
     foo2.disconnect<&BasicFoo::dataChanged>(conn2);
-    foo2.emit<&BasicFoo::dataChanged>();
+    emit foo2.dataChanged();
     ASSERT_EQ(x, 2);
 }
 

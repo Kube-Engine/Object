@@ -96,6 +96,9 @@ private:
  */
 #define K_FUNCTION_OVERLOAD(name, FunctionType) FUNCTION_OVERLOAD(name, FunctionType)
 
+/** @brief The emit macro, totally useless but adds clarity to differentiate functions and signal functions calls */
+#define emit
+
 namespace kF
 {
     /** @brief Registers all base types */
