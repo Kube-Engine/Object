@@ -18,10 +18,11 @@ private: \
     ADD_PREFIX_EACH(KUBE_MAKE_, __VA_ARGS__) \
     [[nodiscard]] static inline kF::Meta::RegisterLater RegisterMetaData(void) \
     { \
-        return kF::Meta::RegisterLater::Make<ClassType>( \
+        return kF::Meta::RegisterLater::Make<_MetaType>( \
             [] { \
-                std::cout << "Registering type " << #ClassType << std::endl; \
-                KUBE_REGISTER_TYPE(ClassType) \
+                std::string literal = kF::Internal::GetTemplateSpecializedLiterals<_MetaType>(#ClassType); \
+                std::cout << "[ Registering meta-type '" << literal << "' ]" << std::endl; \
+                KUBE_REGISTER_TYPE(ClassType, literal) \
                     ADD_PREFIX_EACH(KUBE_REGISTER_, __VA_ARGS__) ; \
             } \
         ); \
@@ -29,10 +30,11 @@ private: \
     static inline kF::Meta::RegisterLater _RegisterLaterInstance { RegisterMetaData() };
 
 /** @brief Register a new type (already used by 'KUBE_REGISTER' and 'KUBE_REGISTER_INSTANTIABLE') */
-#define KUBE_REGISTER_TYPE(ClassType) \
+#define KUBE_REGISTER_TYPE(ClassType, ClassLiteral) \
     kF::Meta::Factory<_MetaType>( \
         kF::Hash(#ClassType), \
-        kF::Internal::GetTemplateSpecializedName<_MetaType>(kF::Hash(#ClassType)) \
+        kF::Internal::GetTemplateSpecializedName<_MetaType>(kF::Hash(#ClassType)), \
+        ClassLiteral \
     )
 
 /** @brief Register a base type */
@@ -172,8 +174,7 @@ namespace kF::Internal
                 return GetTemplateTypeNames<typename Decomposer::TypesTuple>(
                     GetTemplateVariableNames<Decomposer::VarsTuple>(hash)
                 );
-        }
-        else
+        } else
             return hash;
     }
 
@@ -202,6 +203,66 @@ namespace kF::Internal
             return hash;
         else
             return GetTemplateVariableNames<VarsTuple, Index + 1>(hash);
+    }
+
+    /** @brief Helper used internally to query the name of a specialized template type */
+    template<typename TemplateType>
+    [[nodiscard]] std::string GetTemplateSpecializedLiterals(const std::string_view &literal)
+    {
+        using Decomposer = Meta::Internal::TemplateDecomposer<TemplateType>;
+
+        std::string name(literal);
+
+        if constexpr (Decomposer::IsTemplate) {
+            name += '<';
+            if constexpr (Decomposer::HasTypes && !Decomposer::HasVariables)
+                GetTemplateTypeLiterals<typename Decomposer::TypesTuple>(name);
+            else if constexpr (!Decomposer::HasTypes && Decomposer::HasVariables)
+                GetTemplateVariableLiterals<Decomposer::VarsTuple>(name);
+            else if constexpr (Decomposer::TypesBeforeArguments) {
+                GetTemplateVariableLiterals<Decomposer::VarsTuple>(name);
+                name += ", ";
+                GetTemplateTypeLiterals<typename Decomposer::TypesTuple>(name);
+            } else {
+                GetTemplateTypeLiterals<typename Decomposer::TypesTuple>(name);
+                name += ", ";
+                GetTemplateVariableLiterals<Decomposer::VarsTuple>(name);
+            }
+            name += '>';
+        }
+        return name;
+    }
+
+    /** @brief Helper used internally to query the template type literal name of a specialized template type */
+    template<typename TypesTuple, std::size_t Index = 0ul>
+    void GetTemplateTypeLiterals(std::string &name)
+    {
+        auto literal = Meta::Factory<std::tuple_element_t<Index, TypesTuple>>::Resolve().literal();
+        if (literal.empty())
+            name += "???";
+        else
+            name += literal;
+        if constexpr (Index + 1 == std::tuple_size_v<TypesTuple>)
+            return;
+        else {
+            name += ", ";
+            return GetTemplateVariableLiterals<TypesTuple, Index + 1>(name);
+        }
+    }
+
+    /** @brief Helper used internally to query the template variable literal name of a specialized template type */
+    template<auto VarsTuple, std::size_t Index = 0ul>
+    void GetTemplateVariableLiterals(std::string &name)
+    {
+        using Tuple = decltype(VarsTuple);
+
+        name += std::to_string(std::get<Index>(VarsTuple));
+        if constexpr (Index + 1 == std::tuple_size_v<Tuple>)
+            return;
+        else {
+            name += ", ";
+            return GetTemplateVariableLiterals<VarsTuple, Index + 1>(name);
+        }
     }
 
     /** @brief Transform a type to a constant reference (add constant tag to pointers) */

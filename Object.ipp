@@ -5,15 +5,11 @@
 
 inline kF::Object::~Object(void) noexcept
 {
-    if (_cache) {
-        auto &slotTable = *_cache->slotTable;
-        for (auto &owned : _cache->ownedSlots)
-            slotTable.remove(owned);
-        for (auto &registered : _cache->registeredSlots)
-            slotTable.remove(registered.second);
-    }
+    if (!_cache)
+        return;
+    disconnect();
     if (_cache->tree)
-        unsetParent();
+        removeFromTree();
 }
 
 inline const kF::Object *kF::Object::parent(void) const noexcept
@@ -29,14 +25,14 @@ inline void kF::Object::parent(Object * const parentPtr) noexcept_ndebug
     if (parentPtr) [[likely]]
         parent(*parentPtr);
     else if (hasParent())
-        unsetParent();
+        removeFromTree();
 }
 
 inline void kF::Object::parent(Object &parentRef) noexcept_ndebug
 {
     HashedName id = 0u;
 
-    if (_cache && _cache->tree) [[unlikely]]
+    if (isInTree()) [[unlikely]]
         id = _cache->tree->get(_cache->index).id;
     parent(parentRef, id);
 }
@@ -122,10 +118,10 @@ inline void kF::Object::parent(ObjectUtils::Tree &tree, ObjectUtils::Tree::Index
     emit parentChanged();
 }
 
-inline void kF::Object::unsetParent(void) noexcept_ndebug
+inline void kF::Object::removeFromTree(void) noexcept_ndebug
 {
-    kFAssert(hasParent(),
-        throw std::logic_error("Object::unsetParent: Object has no parent"));
+    kFAssert(isInTree(),
+        throw std::logic_error("Object::removeFromTree: Object is not in a tree"));
     const auto oldParent = parentUnsafe();
     _cache->tree->remove(_cache->index);
     _cache->tree = nullptr;
@@ -156,7 +152,7 @@ inline void kF::Object::id(const HashedName id) noexcept_ndebug
 
 inline kF::Object::ObjectIndex kF::Object::childrenCount(void) const noexcept
 {
-    if (_cache && _cache->tree) [[likely]]
+    if (isInTree()) [[likely]]
         return childrenCountUnsafe();
     else [[unlikely]]
         return 0u;
@@ -259,9 +255,8 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     kFAssert(signal.operator bool(),
         throw std::logic_error("Object::connect: Can't establish connection to invalid signal"));
 
-    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot)) };
+    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot), 1u) };
 
-    handle = slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot));
     if constexpr (EnsureCache == IsEnsureCache::Yes)
         ensureCache();
     _cache->registeredSlots.push(signal, handle);
@@ -274,7 +269,73 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     return handle;
 }
 
-inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle)
+template<typename Receiver, typename Slot>
+inline kF::Object::ConnectionHandle kF::Object::ConnectMultiple(Meta::SlotTable &slotTable,
+        Object *objectBegin, Object *objectEnd,
+        const Meta::Signal *signalBegin, const Meta::Signal *signalEnd,
+        const void * const receiver, Slot &&slot)
+    noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
+{
+    using Decomposer = Meta::Internal::FunctionDecomposerHelper<Slot>;
+
+    if constexpr (!std::is_same_v<Receiver, void> && Decomposer::IsMember && !Decomposer::IsFunctor) {
+        static_assert(std::is_same_v<Receiver, typename Decomposer::ClassType>, "You tried to connect receiver to a non-receiver member function");
+        static_assert(std::is_const_v<Receiver> == Decomposer::IsConst, "You tried to connect a volatile member slot with a constant receiver");
+    }
+
+    const auto count = static_cast<std::uint32_t>(std::distance(signalBegin, signalEnd));
+    kFAssert(count == std::distance(objectBegin, objectEnd),
+        throw std::logic_error("Object::ConnectMultiple: Number of objects must be equal to number of signals"));
+
+    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot), count) };
+
+    while (objectBegin != objectEnd) {
+        kFAssert(signalBegin->operator bool(),
+            throw std::logic_error("Object::ConnectMultiple: Invalid signal in the list"));
+        objectBegin->ensureCache();
+        objectBegin->_cache->registeredSlots.push(*signalBegin, handle);
+        ++objectBegin;
+        ++signalBegin;
+    }
+    if constexpr (std::is_base_of_v<Object, Receiver>) {
+        reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureCache();
+        reinterpret_cast<Object*>(const_cast<void *>(receiver))->_cache->ownedSlots.push(handle);
+    }
+    return handle;
+}
+
+inline void kF::Object::disconnect(void)
+{
+    auto &slotTable = getDefaultSlotTable<IsEnsureCache::No>();
+
+    for (auto owned : _cache->ownedSlots)
+        slotTable.remove<true>(owned);
+    _cache->ownedSlots.clear();
+    for (const auto &registered : _cache->registeredSlots)
+        slotTable.remove<false>(registered.second);
+    _cache->registeredSlots.clear();
+}
+
+inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal)
+{
+    auto it = std::remove_if(_cache->registeredSlots.begin(), _cache->registeredSlots.end(),
+        [&slotTable, signal](const auto &pair) {
+            if (pair.first != signal) [[likely]]
+                return false;
+            slotTable.remove<false>(pair.second);
+            return true;
+        }
+    );
+
+    if (it != _cache->registeredSlots.end()) [[likely]] {
+        _cache->registeredSlots.erase(it, _cache->registeredSlots.end());
+        return true;
+    }
+    return false;
+}
+
+template<bool HasOwnership>
+inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle)
 {
     auto it = _cache->registeredSlots.begin();
     const auto end = _cache->registeredSlots.end();
@@ -285,16 +346,19 @@ inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
             continue;
         }
         _cache->registeredSlots.erase(it);
-        slotTable.remove(handle);
-        return;
+        slotTable.remove<HasOwnership>(handle);
+        return true;
     }
-    throw std::logic_error("Object::disconnect: Slot not found");
+    return false;
 }
 
 template<typename Receiver>
-inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, const ConnectionHandle handle)
+inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, const ConnectionHandle handle)
 {
-    disconnect(slotTable, signal, handle);
+    auto it = _cache->registeredSlots.begin();
+    const auto end = _cache->registeredSlots.end();
+    bool found = disconnect<std::is_base_of_v<Object, Receiver>>(slotTable, signal, handle);
+
     if constexpr (std::is_base_of_v<Object, Receiver>) {
         auto it = reinterpret_cast<std::remove_cvref_t<Receiver *>>(receiver)->_cache.ownedSlots.begin();
         const auto end = reinterpret_cast<std::remove_cvref_t<Receiver *>>(receiver)->_cache.ownedSlots.end();
@@ -304,11 +368,15 @@ inline void kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
                 ++it;
                 continue;
             }
-            _cache->registeredSlots.erase(it);
-            return;
+            _cache->ownedSlots.erase(it);
+            if (!found) {
+                slotTable.remove<true>(handle);
+                found = true;
+            }
+            break;
         }
-        throw std::logic_error("Object::disconnect: Slot not found in receiver");
     }
+    return found;
 }
 
 template<kF::Object::IsEnsureCache EnsureCache, typename ...Args>
@@ -316,15 +384,18 @@ inline void kF::Object::emitSignal(Meta::SlotTable &slotTable, const Meta::Signa
 {
     kFAssert(signal,
         throw std::logic_error("Object::emitSignal: Unknown signal"));
+    kFAssert(signal.argsCount() == sizeof...(Args),
+        throw std::logic_error("Object::emitSignal: Invalid number of argument"));
     if constexpr (EnsureCache == IsEnsureCache::Yes)
         ensureCache();
     Var arguments[sizeof...(Args)] { Var::Assign(std::forward<Args>(args))... };
     const auto it = std::remove_if(_cache->registeredSlots.begin(), _cache->registeredSlots.end(),
         [&slotTable, signal, &arguments](auto &pair) -> bool {
-            if (signal != pair.first) [[likely]]
+            if (signal != pair.first) [[likely]] {
                 return false;
-            else [[unlikely]]
-                return !slotTable.invoke(pair.second, arguments).operator bool();
+            } else [[unlikely]] {
+                return !slotTable.invoke(pair.second, arguments);
+            }
         }
     );
     if (it != _cache->registeredSlots.end()) [[unlikely]]

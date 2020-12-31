@@ -96,17 +96,18 @@ private: \
 
 /** @brief Const reference getter for any type */
 #define KUBE_MAKE_GETTER(PropertyType, name) \
-    [[nodiscard]] kF::Internal::ToConstReference<PropertyType> name(void) const noexcept { return _##name; }
+    [[nodiscard]] inline kF::Internal::ToConstReference<PropertyType> name(void) const noexcept { return _##name; }
 
 /** @brief Either const and volatiele getter for any type */
 #define KUBE_MAKE_GETTER_REF(PropertyType, name) \
     KUBE_MAKE_GETTER(PropertyType, name) \
-    [[nodiscard]] PropertyType &name(void) noexcept { return _##name; }
+    [[nodiscard]] inline PropertyType &name(void) noexcept { return _##name; }
 
 /** @brief Copy setter for any type (with signal emition) */
 #define KUBE_MAKE_SETTER(PropertyType, name) \
     template<typename _PropertyType> requires (std::is_same_v<std::remove_cvref_t<_PropertyType>, PropertyType>) \
-    bool name(_PropertyType &&value) noexcept_forward_assignable(decltype(value)) { \
+    inline bool name(_PropertyType &&value) noexcept_forward_assignable(decltype(value)) \
+    { \
         if (_##name == value) \
             return false; \
         _##name = std::forward<_PropertyType>(value); \
@@ -117,14 +118,21 @@ private: \
 /** @brief Copy / Move setter for any type (without signal emition) */
 #define KUBE_MAKE_SETTER_SIGLESS(PropertyType, name) \
     template<typename _PropertyType> requires (std::is_same_v<std::remove_cvref_t<_PropertyType>, PropertyType>) \
-    void name(_PropertyType &&value) noexcept_forward_assignable(decltype(value)) { \
+    inline void name(_PropertyType &&value) noexcept_forward_assignable(decltype(value))  \
+    { \
         _##name = std::forward<_PropertyType>(value); \
     }
 
 /** @brief Declare a signal (used internal) */
 #define KUBE_MAKE_SIGNAL_IMPL(SCOPE, name, ...) \
 SCOPE: \
-    void name(NAME_EACH(__VA_ARGS__)) { emitSignal<&_MetaType::name>(FORWARD_NAME_EACH(__VA_ARGS__)); }
+    inline void name(NAME_EACH(__VA_ARGS__)) \
+    { \
+        static kF::Meta::Signal Cache; \
+        if (!Cache) [[unlikely]] \
+            Cache = getMetaType().findSignal<&_MetaType::name>(); \
+        emitSignal(Cache __VA_OPT__(, FORWARD_NAME_EACH(__VA_ARGS__))); \
+    } \
 
 /** @brief Declare a public signal */
 #define KUBE_MAKE_SIGNAL(name, ...) KUBE_MAKE_SIGNAL_IMPL(public, name, __VA_ARGS__)

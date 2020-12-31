@@ -154,3 +154,47 @@ TEST(Object, AdvancedFoo)
     ASSERT_EQ(foo.readonlyCopyInt(), 24);
     ASSERT_EQ(trigger, 1);
 }
+
+TEST(Object, ConnectionMultiple)
+{
+    Meta::Resolver::Clear();
+    RegisterMetadata();
+
+    Object receiver;
+    Object emiters[5];
+    Meta::Signal signals[5];
+    int x = 0;
+
+    std::fill(std::begin(signals), std::end(signals), receiver.getMetaType().findSignal("parentChanged"_hash));
+    auto handle = Object::ConnectMultiple(
+        receiver.getDefaultSlotTable(),
+        std::begin(emiters), std::end(emiters),
+        std::begin(signals), std::end(signals),
+        receiver, [&x] { ++x; }
+    );
+    int y = 0;
+    for (auto &emiter : emiters) {
+        emiter.parentChanged();
+        ASSERT_EQ(x, ++y);
+    }
+    for (auto &emiter : emiters) {
+        emiter.parentChanged();
+        ASSERT_EQ(x, ++y);
+        emiter.disconnect<&Object::parentChanged>(handle);
+    }
+    for (auto &emiter : emiters) {
+        emiter.parentChanged();
+        ASSERT_EQ(x, y);
+    }
+    handle = Object::ConnectMultiple(
+        receiver.getDefaultSlotTable(),
+        std::begin(emiters), std::end(emiters),
+        std::begin(signals), std::end(signals),
+        receiver, [&x] { ++x; }
+    );
+    for (auto &emiter : emiters) {
+        emiter.parentChanged();
+        ASSERT_EQ(x, ++y);
+    }
+    receiver.disconnect();
+}

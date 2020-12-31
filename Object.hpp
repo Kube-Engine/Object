@@ -21,7 +21,8 @@ class kF::Object
     K_ABSTRACT(Object,
         K_PROPERTY_CUSTOM_COPY(Object *, parent,
             static_cast<Object*(Object::*)(void) noexcept>(&Object::parent),
-            static_cast<void(Object::*)(Object*) noexcept_ndebug>(&Object::parent)),
+            static_cast<void(Object::*)(Object*) noexcept_ndebug>(&Object::parent)
+        ),
         K_PROPERTY_CUSTOM_GETONLY(ObjectIndex, childrenCount, &Object::childrenCount)
     )
 
@@ -82,16 +83,22 @@ public:
     virtual void onChildRemoved(Object &object) {}
 
 
-    /** @brief Get the object ID if any */
+    /** @brief Get the object ID if any
+     *  Note that only objects in a tree can have an ID */
     [[nodiscard]] HashedName id(void) const noexcept;
 
-    /** @brief Set the object ID if attached to any tree */
+    /** @brief Set the object ID if attached to any tree
+     *  Note that only objects in a tree can have an ID */
     void id(const HashedName id) noexcept_ndebug;
 
 
+    /** @brief Check if the instance is in a tree */
+    [[nodiscard]] bool isInTree(void) const noexcept
+        { return _cache && _cache->tree; }
+
     /** @brief Check if the instance has a parent and thus is in a tree */
     [[nodiscard]] bool hasParent(void) const noexcept
-        { return _cache && _cache->parentIndex != ObjectUtils::Tree::NullIndex; }
+        { return _cache && _cache->parentIndex != ObjectUtils::Tree::RootIndex && _cache->parentIndex != ObjectUtils::Tree::NullIndex; }
 
     /** @brief Get the parent object if any */
     [[nodiscard]] Object *parent(void) noexcept
@@ -106,7 +113,7 @@ public:
 
     /** @brief Set the parent object and inserts this instance into parent's object-tree
      *  Note that this function will preserve the ID of the object if already in a tree
-     *  Note that if parent is null, unsetParent is called */
+     *  Note that if parent is null, removeFromTree is called */
     void parent(Object * const parent) noexcept_ndebug;
 
     /** @brief Set the parent object and inserts this instance into parent's object-tree
@@ -122,9 +129,9 @@ public:
     void parent(ObjectUtils::Tree &tree, ObjectIndex parentIndex, const HashedName id) noexcept;
 
     /** @brief Remove links to the actual parent
-     *  This function assert that a parent is set
+     *  This function assert that object is in a tree
      *  Note that this function loses the actual ID of the object */
-    void unsetParent(void) noexcept_ndebug;
+    void removeFromTree(void) noexcept_ndebug;
 
     /** @brief Returns the number of children if any */
     [[nodiscard]] ObjectIndex childrenCount(void) const noexcept;
@@ -281,48 +288,67 @@ public:
         { return connect<IsEnsureCache::Yes, const Receiver, Slot>(slotTable, signal, &receiver, std::forward<Slot>(slot)); }
 
 
+    /** @brief Fully disconnect every connection of an object */
+    void disconnect(void);
+
+    /** @brief Disconnect every registered slot matching a specific signal either by pointer, hashed name or meta signal (may take custom SlotTable) */
+    template<auto SignalPtr>
+    bool disconnect(void)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal<SignalPtr>()); }
+    template<auto SignalPtr>
+    bool disconnect(Meta::SlotTable &slotTable)
+        { return disconnect(slotTable, getMetaType().findSignal<SignalPtr>()); }
+    bool disconnect(const HashedName name)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name)); }
+    bool disconnect(Meta::SlotTable &slotTable, const HashedName name)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name)); }
+    bool disconnect(const Meta::Signal signal)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), signal); }
+    bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal);
+
     /** @brief Disconnect a slot using a signal function ptr and a connection handle (may take custom SlotTable) */
     template<auto SignalPtr>
-    void disconnect(const ConnectionHandle handle)
-        { disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal<SignalPtr>(), handle); }
+    bool disconnect(const ConnectionHandle handle)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal<SignalPtr>(), handle); }
     template<auto SignalPtr>
-    void disconnect(Meta::SlotTable &slotTable, const ConnectionHandle handle)
-        { disconnect(slotTable, getMetaType().findSignal<SignalPtr>(), handle); }
+    bool disconnect(Meta::SlotTable &slotTable, const ConnectionHandle handle)
+        { return disconnect(slotTable, getMetaType().findSignal<SignalPtr>(), handle); }
 
     /** @brief Disconnect a slot using a signal name and a connection handle (may take custom SlotTable) */
-    void disconnect(const HashedName name, const ConnectionHandle handle)
-        { disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name), handle); }
-    void disconnect(Meta::SlotTable &slotTable, const HashedName name, const ConnectionHandle handle)
-        { disconnect(slotTable, getMetaType().findSignal(name), handle); }
+    bool disconnect(const HashedName name, const ConnectionHandle handle)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name), handle); }
+    bool disconnect(Meta::SlotTable &slotTable, const HashedName name, const ConnectionHandle handle)
+        { return disconnect(slotTable, getMetaType().findSignal(name), handle); }
 
     /** @brief Disconnect a slot using a signal and a connection handle (may take custom SlotTable) */
-    void disconnect(const Meta::Signal signal, const ConnectionHandle handle)
-        { disconnect(getDefaultSlotTable<IsEnsureCache::No>(), signal, handle); }
-    void disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle);
+    bool disconnect(const Meta::Signal signal, const ConnectionHandle handle)
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), signal, handle); }
+    template<bool HasOwnership = false>
+    bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle);
 
     /** @brief Disconnect a slot using a signal name, a receiver and a connection handle (may take custom SlotTable) */
     template<auto SignalPtr, typename Receiver>
-    void disconnect(const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(getDefaultSlotTable(), getMetaType().findSignal<SignalPtr>(), &receiver, handle); }
+    bool disconnect(const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(getDefaultSlotTable(), getMetaType().findSignal<SignalPtr>(), &receiver, handle); }
     template<auto SignalPtr, typename Receiver>
-    void disconnect(Meta::SlotTable &slotTable, const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(slotTable, getMetaType().findSignal<SignalPtr>(), &receiver, handle); }
+    bool disconnect(Meta::SlotTable &slotTable, const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(slotTable, getMetaType().findSignal<SignalPtr>(), &receiver, handle); }
 
     /** @brief Disconnect a slot using a signal name, a receiver and a connection handle (may take custom SlotTable) */
     template<typename Receiver>
-    void disconnect(const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(getDefaultSlotTable(), getMetaType().findSignal(name), &receiver, handle); }
+    bool disconnect(const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(getDefaultSlotTable(), getMetaType().findSignal(name), &receiver, handle); }
     template<typename Receiver>
-    void disconnect(Meta::SlotTable &slotTable, const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(slotTable, getMetaType().findSignal(name), &receiver, handle); }
+    bool disconnect(Meta::SlotTable &slotTable, const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(slotTable, getMetaType().findSignal(name), &receiver, handle); }
 
     /** @brief Disconnect a slot using a signal, a receiver and a connection handle (may take custom SlotTable) */
     template<typename Receiver>
-    void disconnect(const Meta::Signal signal, const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(getDefaultSlotTable(), signal, &receiver, handle); }
+    bool disconnect(const Meta::Signal signal, const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(getDefaultSlotTable(), signal, &receiver, handle); }
     template<typename Receiver>
-    void disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const Receiver &receiver, const ConnectionHandle handle)
-        { disconnect<Receiver>(slotTable, signal, &receiver, handle); }
+    bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const Receiver &receiver, const ConnectionHandle handle)
+        { return disconnect<Receiver>(slotTable, signal, &receiver, handle); }
 
 
     /** @brief Emit signal matching 'SignalPtr' using default slot table */
@@ -365,6 +391,31 @@ public:
     void setDefaultSlotTable(Meta::SlotTable &slotTable) noexcept_ndebug;
 
 
+    /** @brief Same as connect but with a multiple signal single slot pattern
+     *  Note that this function is very useful to preserve memory */
+    template<typename Slot>
+    static ConnectionHandle ConnectMultiple(Meta::SlotTable &slotTable,
+            Object *objectBegin, Object *objectEnd,
+            const Meta::Signal *signalBegin, const Meta::Signal *signalEnd,
+            Slot &&slot)
+        noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
+        { return ConnectMultiple<void>(slotTable, objectBegin, objectEnd, signalBegin, signalEnd, nullptr, std::forward<Slot>(slot)); }
+    template<typename Receiver, typename Slot>
+    static ConnectionHandle ConnectMultiple(Meta::SlotTable &slotTable,
+            Object *objectBegin, Object *objectEnd,
+            const Meta::Signal *signalBegin, const Meta::Signal *signalEnd,
+            Receiver &receiver, Slot &&slot)
+        noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
+        { return ConnectMultiple<Receiver>(slotTable, objectBegin, objectEnd, signalBegin, signalEnd, &receiver, std::forward<Slot>(slot)); }
+    template<typename Receiver, typename Slot>
+    static ConnectionHandle ConnectMultiple(Meta::SlotTable &slotTable,
+            Object *objectBegin, Object *objectEnd,
+            const Meta::Signal *signalBegin, const Meta::Signal *signalEnd,
+            const Receiver &receiver, Slot &&slot)
+        noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
+        { return ConnectMultiple<const Receiver>(slotTable, objectBegin, objectEnd, signalBegin, signalEnd, &receiver, std::forward<Slot>(slot)); }
+
+
 private:
     std::unique_ptr<Cache> _cache {};
 
@@ -378,11 +429,19 @@ private:
 
     /** @brief Disconnect a member slot implementation */
     template<typename Receiver>
-    void disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, const ConnectionHandle handle);
+    bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const void * const receiver, const ConnectionHandle handle);
 
     /** @brief Emit a signal using a specific slot table */
     template<IsEnsureCache EnsureCache, typename ...Args>
     void emitSignal(Meta::SlotTable &slotTable, const Meta::Signal signal, Args &&...args);
+
+    /** @brief ConnectionMultiple implementation */
+    template<typename Receiver, typename Slot>
+    static ConnectionHandle ConnectMultiple(Meta::SlotTable &slotTable,
+            Object *objectBegin, Object *objectEnd,
+            const Meta::Signal *signalBegin, const Meta::Signal *signalEnd,
+            const void * const receiver, Slot &&slot)
+        noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot));
 };
 
 #include "Object.ipp"

@@ -92,7 +92,7 @@ inline kF::ObjectUtils::Tree::Index kF::ObjectUtils::Tree::findInScope(const Has
         auto &parent = get(parentIndex);
         if (parent.id == id) [[unlikely]]
             return parentIndex;
-        for (const auto childIndex : node.children) {
+        for (const auto childIndex : parent.children) {
             auto &child = get(childIndex);
             if (child.id == id) [[unlikely]]
                 return childIndex;
