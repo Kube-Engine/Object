@@ -6,7 +6,6 @@
 #pragma once
 
 #include "Reflection.hpp"
-#include "Runtime.hpp"
 #include "Tree.hpp"
 
 namespace kF
@@ -22,6 +21,14 @@ class kF::Object
         K_PROPERTY_CUSTOM_COPY(Object *, parent,
             static_cast<Object*(Object::*)(void) noexcept>(&Object::parent),
             static_cast<void(Object::*)(Object*) noexcept_ndebug>(&Object::parent)
+        ),
+        K_PROPERTY_CUSTOM_COPY(bool, enabled,
+            static_cast<bool(Object::*)(void) const noexcept>(&Object::enabled),
+            static_cast<void(Object::*)(const bool) noexcept_ndebug>(&Object::enabled)
+        ),
+        K_PROPERTY_CUSTOM_COPY(bool, visible,
+            static_cast<bool(Object::*)(void) const noexcept>(&Object::visible),
+            static_cast<void(Object::*)(const bool) noexcept_ndebug>(&Object::visible)
         ),
         K_PROPERTY_CUSTOM_GETONLY(ObjectIndex, childrenCount, &Object::childrenCount)
     )
@@ -45,7 +52,6 @@ public:
     /** @brief Connection table of an object */
     struct alignas_cacheline Cache
     {
-        std::unique_ptr<ObjectUtils::Runtime> data {};
         ObjectUtils::Tree *tree { nullptr };
         ObjectIndex index { ObjectUtils::Tree::NullIndex };
         ObjectIndex parentIndex { ObjectUtils::Tree::NullIndex };
@@ -87,9 +93,39 @@ public:
      *  Note that only objects in a tree can have an ID */
     [[nodiscard]] HashedName id(void) const noexcept;
 
-    /** @brief Set the object ID if attached to any tree
+    /** @brief Get the object ID (crash if not in a tree)
+     *  Note that only objects in a tree can have an ID */
+    [[nodiscard]] HashedName idUnsafe(void) const noexcept;
+
+    /** @brief Set the object ID if attached to a tree
      *  Note that only objects in a tree can have an ID */
     void id(const HashedName id) noexcept_ndebug;
+
+
+    /** @brief Get the object enabled state if any
+     *  Note that only objects in a tree can have a enabled state */
+    [[nodiscard]] bool enabled(void) const noexcept;
+
+    /** @brief Get the object enabled state (crash if not in a tree)
+     *  Note that only objects in a tree can have a enabled state */
+    [[nodiscard]] bool enabledUnsafe(void) const noexcept;
+
+    /** @brief set the object enabled state if attached to a tree
+     *  Note that only objects in a tree can have a enabled state */
+    void enabled(const bool state) noexcept_ndebug;
+
+
+    /** @brief Get the object visible state if any
+     *  Note that only objects in a tree can have a visible state */
+    [[nodiscard]] bool visible(void) const noexcept;
+
+    /** @brief Get the object visible state (crash if not in a tree)
+     *  Note that only objects in a tree can have a visible state */
+    [[nodiscard]] bool visibleUnsafe(void) const noexcept;
+
+    /** @brief set the object visible state if attached to a tree
+     *  Note that only objects in a tree can have a visible state */
+    void visible(const bool state) noexcept_ndebug;
 
 
     /** @brief Check if the instance is in a tree */
@@ -323,7 +359,6 @@ public:
     /** @brief Disconnect a slot using a signal and a connection handle (may take custom SlotTable) */
     bool disconnect(const Meta::Signal signal, const ConnectionHandle handle)
         { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), signal, handle); }
-    template<bool HasOwnership = false>
     bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle);
 
     /** @brief Disconnect a slot using a signal name, a receiver and a connection handle (may take custom SlotTable) */

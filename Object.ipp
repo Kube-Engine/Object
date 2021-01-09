@@ -138,9 +138,14 @@ inline void kF::Object::removeFromTree(void) noexcept_ndebug
 inline kF::HashedName kF::Object::id(void) const noexcept
 {
     if (_cache && _cache->index != ObjectUtils::Tree::NullIndex) [[likely]]
-        return _cache->tree->get(_cache->index).id;
-    else
+        return idUnsafe();
+    else [[unlikely]]
         return 0u;
+}
+
+inline kF::HashedName kF::Object::idUnsafe(void) const noexcept
+{
+    return _cache->tree->get(_cache->index).id;
 }
 
 inline void kF::Object::id(const HashedName id) noexcept_ndebug
@@ -148,6 +153,46 @@ inline void kF::Object::id(const HashedName id) noexcept_ndebug
     kFAssert(_cache->index != ObjectUtils::Tree::NullIndex,
         throw std::logic_error("Object::id: To set an object's id, the object must live inside an ObjectUtils::Tree"));
     _cache->tree->get(_cache->index).id = id;
+}
+
+inline bool kF::Object::enabled(void) const noexcept
+{
+    if (_cache && _cache->index != ObjectUtils::Tree::NullIndex) [[likely]]
+        return enabledUnsafe();
+    else [[unlikely]]
+        return false;
+}
+
+inline bool kF::Object::enabledUnsafe(void) const noexcept
+{
+    return _cache->tree->get(_cache->index).enabled;
+}
+
+inline void kF::Object::enabled(const bool state) noexcept_ndebug
+{
+    kFAssert(_cache->index != ObjectUtils::Tree::NullIndex,
+        throw std::logic_error("Object::enabled: To set an object's enabled state, the object must live inside an ObjectUtils::Tree"));
+    _cache->tree->get(_cache->index).enabled = state;
+}
+
+inline bool kF::Object::visible(void) const noexcept
+{
+    if (_cache && _cache->index != ObjectUtils::Tree::NullIndex) [[likely]]
+        return visibleUnsafe();
+    else [[unlikely]]
+        return false;
+}
+
+inline bool kF::Object::visibleUnsafe(void) const noexcept
+{
+    return _cache->tree->get(_cache->index).visible;
+}
+
+inline void kF::Object::visible(const bool state) noexcept_ndebug
+{
+    kFAssert(_cache->index != ObjectUtils::Tree::NullIndex,
+        throw std::logic_error("Object::visible: To set an object's visible state, the object must live inside an ObjectUtils::Tree"));
+    _cache->tree->get(_cache->index).visible = state;
 }
 
 inline kF::Object::ObjectIndex kF::Object::childrenCount(void) const noexcept
@@ -255,7 +300,7 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     kFAssert(signal.operator bool(),
         throw std::logic_error("Object::connect: Can't establish connection to invalid signal"));
 
-    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot), 1u) };
+    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot)) };
 
     if constexpr (EnsureCache == IsEnsureCache::Yes)
         ensureCache();
@@ -283,11 +328,10 @@ inline kF::Object::ConnectionHandle kF::Object::ConnectMultiple(Meta::SlotTable 
         static_assert(std::is_const_v<Receiver> == Decomposer::IsConst, "You tried to connect a volatile member slot with a constant receiver");
     }
 
-    const auto count = static_cast<std::uint32_t>(std::distance(signalBegin, signalEnd));
-    kFAssert(count == std::distance(objectBegin, objectEnd),
+    kFAssert(std::distance(signalBegin, signalEnd) == std::distance(objectBegin, objectEnd),
         throw std::logic_error("Object::ConnectMultiple: Number of objects must be equal to number of signals"));
 
-    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot), count) };
+    auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot)) };
 
     while (objectBegin != objectEnd) {
         kFAssert(signalBegin->operator bool(),
@@ -309,10 +353,10 @@ inline void kF::Object::disconnect(void)
     auto &slotTable = getDefaultSlotTable<IsEnsureCache::No>();
 
     for (auto owned : _cache->ownedSlots)
-        slotTable.remove<true>(owned);
+        slotTable.remove(owned);
     _cache->ownedSlots.clear();
     for (const auto &registered : _cache->registeredSlots)
-        slotTable.remove<false>(registered.second);
+        slotTable.remove(registered.second);
     _cache->registeredSlots.clear();
 }
 
@@ -322,7 +366,7 @@ inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
         [&slotTable, signal](const auto &pair) {
             if (pair.first != signal) [[likely]]
                 return false;
-            slotTable.remove<false>(pair.second);
+            slotTable.remove(pair.second);
             return true;
         }
     );
@@ -334,7 +378,6 @@ inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
     return false;
 }
 
-template<bool HasOwnership>
 inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal, const ConnectionHandle handle)
 {
     auto it = _cache->registeredSlots.begin();
@@ -346,7 +389,7 @@ inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
             continue;
         }
         _cache->registeredSlots.erase(it);
-        slotTable.remove<HasOwnership>(handle);
+        slotTable.remove(handle);
         return true;
     }
     return false;
@@ -370,7 +413,7 @@ inline bool kF::Object::disconnect(Meta::SlotTable &slotTable, const Meta::Signa
             }
             _cache->ownedSlots.erase(it);
             if (!found) {
-                slotTable.remove<true>(handle);
+                slotTable.remove(handle);
                 found = true;
             }
             break;

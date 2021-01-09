@@ -177,9 +177,10 @@ TEST(Object, ConnectionMultiple)
         emiter.parentChanged();
         ASSERT_EQ(x, ++y);
     }
+    ++y;
     for (auto &emiter : emiters) {
         emiter.parentChanged();
-        ASSERT_EQ(x, ++y);
+        ASSERT_EQ(x, y);
         emiter.disconnect<&Object::parentChanged>(handle);
     }
     for (auto &emiter : emiters) {

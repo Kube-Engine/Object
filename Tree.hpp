@@ -27,11 +27,25 @@ namespace kF
 class alignas_cacheline kF::ObjectUtils::Tree
 {
 public:
+    /** @brief Object flags that can be used to perform */
     enum class Flags : std::uint16_t {
-        None = 0b0,
-        MouseHandler = 0b1,
-        KeyHandler = 0b10,
-        DrawHandler = 0b100
+        None            = 0b0,
+        MouseHandler    = 0b1,
+        KeyHandler      = 0b10,
+        DrawHandler     = 0b100,
+        ReservedFlag0   = 0b1000,
+        ReservedFlag1   = 0b10000,
+        ReservedFlag2   = 0b100000,
+        CustomFlag0     = 0b1000000,
+        CustomFlag1     = 0b10000000,
+        CustomFlag2     = 0b100000000,
+        CustomFlag3     = 0b1000000000,
+        CustomFlag4     = 0b10000000000,
+        CustomFlag5     = 0b100000000000,
+        CustomFlag6     = 0b1000000000000,
+        CustomFlag7     = 0b10000000000000,
+        CustomFlag8     = 0b100000000000000,
+        CustomFlag9     = 0b1000000000000000
     };
 
     /** @brief Index of a node in the tree */

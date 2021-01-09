@@ -7,7 +7,6 @@ set(KubeObjectSources
     ${KubeObjectDir}/Object.ipp
     ${KubeObjectDir}/Tree.hpp
     ${KubeObjectDir}/Tree.ipp
-    ${KubeObjectDir}/Runtime.hpp
     ${KubeObjectDir}/Reflection.hpp
     ${KubeObjectDir}/Reflection.cpp
     ${KubeObjectDir}/Register.hpp
