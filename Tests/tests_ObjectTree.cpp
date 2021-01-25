@@ -1,6 +1,6 @@
 /**
  * @ Author: Matthieu Moinvaziri
- * @ Description: Unit tests of Object
+ * @ Description: Unit tests of ObjectTree
  */
 
 #include <iostream>
