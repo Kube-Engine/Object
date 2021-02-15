@@ -11,6 +11,12 @@
 
 #include <Kube/Core/MacroUtils.hpp>
 
+#ifdef KUBE_LOG_META_REGISTERS
+# define _KUBE_INTERNAL_REGISTER_CUSTOM_TYPE_LOG(literal) std::cout << "[ Registering meta-type '" << literal << "' ]" << std::endl;
+#else
+# define _KUBE_INTERNAL_REGISTER_CUSTOM_TYPE_LOG(literal)
+#endif
+
 /** @brief Add static registerer for automatic registeration */
 #define KUBE_REGISTER_LATER(ClassType, ...) \
 private: \
@@ -21,7 +27,7 @@ private: \
         return kF::Meta::RegisterLater::Make<_MetaType>( \
             [] { \
                 std::string literal = kF::Internal::GetTemplateSpecializedLiterals<_MetaType>(#ClassType); \
-                std::cout << "[ Registering meta-type '" << literal << "' ]" << std::endl; \
+                _KUBE_INTERNAL_REGISTER_CUSTOM_TYPE_LOG(literal) \
                 KUBE_REGISTER_TYPE(ClassType, literal) \
                     ADD_PREFIX_EACH(KUBE_REGISTER_, __VA_ARGS__) ; \
             } \
