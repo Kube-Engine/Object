@@ -32,6 +32,7 @@ public: \
 
 /** @brief Generate a property with given parameters (used internally) */
 #define KUBE_MAKE_PROPERTY_IMPL(GETTER_SCOPE, GETTER_TYPE, SETTER_SCOPE, SETTER_TYPE, SIGNAL_SCOPE, PropertyType, name, ...) \
+public: \
     KUBE_MAKE_SIGNAL_IMPL(SIGNAL_SCOPE, name##Changed) \
 GETTER_SCOPE: \
     KUBE_MAKE_##GETTER_TYPE(PropertyType, name) \
