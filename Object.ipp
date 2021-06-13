@@ -39,7 +39,7 @@ inline void kF::Object::parent(Object &parentRef) noexcept_ndebug
 
 inline void kF::Object::parent(Object &parentRef, const HashedName id) noexcept_ndebug
 {
-    ensureCache();
+    ensureObjectCache();
     kFAssert(parentRef._cache && parentRef._cache->tree,
         throw std::logic_error("Object::setParent: Parent object is not in a tree"));
     // Check if the object is already in a tree
@@ -77,7 +77,7 @@ inline void kF::Object::parent(Object &parentRef, const HashedName id) noexcept_
 
 inline void kF::Object::parent(ObjectUtils::Tree &tree, ObjectUtils::Tree::Index parentIndex, const HashedName id) noexcept
 {
-    ensureCache();
+    ensureObjectCache();
     // Check if the object is already in a tree
     if (_cache->parentIndex != ObjectUtils::Tree::NullIndex) [[unlikely]] {
         const auto oldParent = parentUnsafe();
@@ -225,9 +225,36 @@ inline kF::Object *kF::Object::findGlobal(const HashedName id) const noexcept
         return nullptr;
 }
 
+[[nodiscard]] inline kF::Meta::Data kF::Object::findMetaData(const HashedName name) const noexcept
+{
+    auto meta = getMetaType().findData(name);
+
+    if (!meta && hasObjectCache()) [[unlikely]]
+        meta = _cache->runtime.findData(name);
+    return meta;
+}
+
+[[nodiscard]] inline kF::Meta::Signal kF::Object::findMetaSignal(const HashedName name) const noexcept
+{
+    auto meta = getMetaType().findSignal(name);
+
+    if (!meta && hasObjectCache()) [[unlikely]]
+        meta = _cache->runtime.findSignal(name);
+    return meta;
+}
+
+[[nodiscard]] inline kF::Meta::Function kF::Object::findMetaFunction(const HashedName name) const noexcept
+{
+    auto meta = getMetaType().findFunction(name);
+
+    if (!meta && hasObjectCache()) [[unlikely]]
+        meta = _cache->runtime.findFunction(name);
+    return meta;
+}
+
 inline kF::Var kF::Object::getVar(const HashedName name) const
 {
-    if (auto data = getMetaType().findData(name); !data)
+    if (auto data = findMetaData(name); !data)
         throw std::logic_error("Object::get: Invalid hashed name '" + std::to_string(name) + '\'');
     else if (auto res = data.get(this); res)
         return res;
@@ -236,7 +263,7 @@ inline kF::Var kF::Object::getVar(const HashedName name) const
 
 inline void kF::Object::setVar(const HashedName name, const Var &var)
 {
-    if (auto data = getMetaType().findData(name); !data)
+    if (auto data = findMetaData(name); !data)
         throw std::logic_error("Object::set: Invalid hashed name '" + std::to_string(name) + '\'');
     else if (!data.set(this, const_cast<Var &>(var)))
         throw std::logic_error("Object::set: Argument type doesn't match type of hashed name '" + std::to_string(name) + '\'');
@@ -251,7 +278,7 @@ inline void kF::Object::setVar(const Meta::Data metaData, const Var &var)
 template<typename ...Args>
 inline kF::Var kF::Object::invoke(const HashedName name, Args &&...args)
 {
-    auto fct = getMetaType().findFunction(name);
+    auto fct = findMetaFunction(name);
 
     kFAssert(fct,
         throw std::logic_error("Object::invoke: Invalid hashed name '" + std::to_string(name) + '\''));
@@ -268,7 +295,7 @@ template<kF::Object::IsEnsureCache EnsureCache>
 inline kF::Meta::SlotTable &kF::Object::getDefaultSlotTable(void) noexcept_ndebug
 {
     if constexpr (EnsureCache == IsEnsureCache::Yes)
-        ensureCache();
+        ensureObjectCache();
     return *_cache->slotTable;
 }
 
@@ -276,11 +303,11 @@ template<kF::Object::IsEnsureCache EnsureCache>
 inline void kF::Object::setDefaultSlotTable(Meta::SlotTable &slotTable) noexcept_ndebug
 {
     if constexpr (EnsureCache == IsEnsureCache::Yes)
-        ensureCache();
+        ensureObjectCache();
     _cache->slotTable = &slotTable;
 }
 
-inline void kF::Object::ensureCache(void) noexcept_ndebug
+inline void kF::Object::ensureObjectCache(void) noexcept_ndebug
 {
     if (!_cache) [[unlikely]]
         _cache = std::make_unique<Cache>();
@@ -303,11 +330,11 @@ inline kF::Object::ConnectionHandle kF::Object::connect(Meta::SlotTable &slotTab
     auto handle { slotTable.insert<Receiver>(receiver, std::forward<Slot>(slot)) };
 
     if constexpr (EnsureCache == IsEnsureCache::Yes)
-        ensureCache();
+        ensureObjectCache();
     _cache->registeredSlots.push(signal, handle);
     if constexpr (std::is_base_of_v<Object, Receiver>) {
         if (this != receiver) {
-            reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureCache();
+            reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureObjectCache();
             reinterpret_cast<Object*>(const_cast<void *>(receiver))->_cache->ownedSlots.push(handle);
         }
     }
@@ -336,13 +363,13 @@ inline kF::Object::ConnectionHandle kF::Object::ConnectMultiple(Meta::SlotTable 
     while (objectBegin != objectEnd) {
         kFAssert(signalBegin->operator bool(),
             throw std::logic_error("Object::ConnectMultiple: Invalid signal in the list"));
-        objectBegin->ensureCache();
+        objectBegin->ensureObjectCache();
         objectBegin->_cache->registeredSlots.push(*signalBegin, handle);
         ++objectBegin;
         ++signalBegin;
     }
     if constexpr (std::is_base_of_v<Object, Receiver>) {
-        reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureCache();
+        reinterpret_cast<Object*>(const_cast<void *>(receiver))->ensureObjectCache();
         reinterpret_cast<Object*>(const_cast<void *>(receiver))->_cache->ownedSlots.push(handle);
     }
     return handle;
@@ -430,7 +457,7 @@ inline void kF::Object::emitSignal(Meta::SlotTable &slotTable, const Meta::Signa
     kFAssert(signal.argsCount() == sizeof...(Args),
         throw std::logic_error("Object::emitSignal: Invalid number of argument"));
     if constexpr (EnsureCache == IsEnsureCache::Yes)
-        ensureCache();
+        ensureObjectCache();
     Var arguments[sizeof...(Args)] { Var::Assign(std::forward<Args>(args))... };
     const auto it = std::remove_if(_cache->registeredSlots.begin(), _cache->registeredSlots.end(),
         [&slotTable, signal, &arguments](auto &pair) -> bool {

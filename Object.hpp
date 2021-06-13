@@ -7,6 +7,7 @@
 
 #include "Reflection.hpp"
 #include "Tree.hpp"
+#include "ObjectRuntime.hpp"
 
 namespace kF
 {
@@ -50,17 +51,20 @@ public:
     using ConnectionHandle = Meta::SlotTable::OpaqueIndex;
 
     /** @brief Connection table of an object */
-    struct alignas_cacheline Cache
+    struct alignas_double_cacheline Cache
     {
+        // Cacheline 1
         ObjectUtils::Tree *tree { nullptr };
         ObjectIndex index { ObjectUtils::Tree::NullIndex };
         ObjectIndex parentIndex { ObjectUtils::Tree::NullIndex };
         Meta::SlotTable *slotTable { &Meta::Signal::GetSlotTable() };
         Core::TinyVector<std::pair<Meta::Signal, ConnectionHandle>> registeredSlots {};
         Core::TinyVector<ConnectionHandle> ownedSlots {};
+        // Cacheline 2
+        ObjectUtils::ObjectRuntime runtime;
     };
 
-    static_assert_fit_cacheline(Cache);
+    static_assert_fit_double_cacheline(Cache);
 
     /** @brief Default constructor (very cheap) */
     Object(void) noexcept = default;
@@ -127,6 +131,9 @@ public:
      *  Note that only objects in a tree can have a visible state */
     void visible(const bool state) noexcept_ndebug;
 
+    /** @brief Check if the instance has an object cache */
+    [[nodiscard]] bool hasObjectCache(void) const noexcept
+        { return _cache.operator bool(); }
 
     /** @brief Check if the instance is in a tree */
     [[nodiscard]] bool isInTree(void) const noexcept
@@ -194,8 +201,22 @@ public:
     [[nodiscard]] Object *findGlobal(const HashedName id) const noexcept;
 
 
+    /** @brief Unsafe object runtime getter */
+    [[nodiscard]] ObjectUtils::ObjectRuntime &objectRuntime(void) noexcept { return _cache->runtime; }
+    [[nodiscard]] const ObjectUtils::ObjectRuntime &objectRuntime(void) const noexcept { return _cache->runtime; }
+
+    /** @brief Find either a static or a runtime meta data */
+    [[nodiscard]] Meta::Data findMetaData(const HashedName name) const noexcept;
+
+    /** @brief Find either a static or a runtime meta signal */
+    [[nodiscard]] Meta::Signal findMetaSignal(const HashedName name) const noexcept;
+
+    /** @brief Find either a static or a runtime meta function */
+    [[nodiscard]] Meta::Function findMetaFunction(const HashedName name) const noexcept;
+
+
     /** @brief Checks if a meta-variable exists */
-    [[nodiscard]] bool varExists(const HashedName name) const noexcept { return getMetaType().findData(name).operator bool(); }
+    [[nodiscard]] bool varExists(const HashedName name) const noexcept { return findMetaData(name).operator bool(); }
 
     /** @brief Get an opaque meta-variable */
     [[nodiscard]] Var getVar(const HashedName name) const;
@@ -269,27 +290,27 @@ public:
     template<typename Slot>
     ConnectionHandle connect(const HashedName name, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::No, void, Slot>(getDefaultSlotTable(), getMetaType().findSignal(name), nullptr, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::No, void, Slot>(getDefaultSlotTable(), findMetaSignal(name), nullptr, std::forward<Slot>(slot)); }
     template<typename Slot>
     ConnectionHandle connect(Meta::SlotTable &slotTable, const HashedName name, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::Yes, void, Slot>(slotTable, getMetaType().findSignal(name), nullptr, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::Yes, void, Slot>(slotTable, findMetaSignal(name), nullptr, std::forward<Slot>(slot)); }
     template<typename Receiver, typename Slot>
     ConnectionHandle connect(const HashedName name, Receiver &receiver, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::No, Receiver, Slot>(getDefaultSlotTable(), getMetaType().findSignal(name), &receiver, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::No, Receiver, Slot>(getDefaultSlotTable(), findMetaSignal(name), &receiver, std::forward<Slot>(slot)); }
     template<typename Receiver, typename Slot>
     ConnectionHandle connect(const HashedName name, const Receiver &receiver, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::No, const Receiver, Slot>(getDefaultSlotTable(), getMetaType().findSignal(name), &receiver, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::No, const Receiver, Slot>(getDefaultSlotTable(), findMetaSignal(name), &receiver, std::forward<Slot>(slot)); }
     template<typename Receiver, typename Slot>
     ConnectionHandle connect(Meta::SlotTable &slotTable, const HashedName name, Receiver &receiver, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::Yes, Receiver, Slot>(slotTable, getMetaType().findSignal(name), &receiver, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::Yes, Receiver, Slot>(slotTable, findMetaSignal(name), &receiver, std::forward<Slot>(slot)); }
     template<typename Receiver, typename Slot>
     ConnectionHandle connect(Meta::SlotTable &slotTable, const HashedName name, const Receiver &receiver, Slot &&slot)
         noexcept(nothrow_ndebug && nothrow_forward_constructible(Slot))
-        { return connect<IsEnsureCache::Yes, const Receiver, Slot>(slotTable, getMetaType().findSignal(name), &receiver, std::forward<Slot>(slot)); }
+        { return connect<IsEnsureCache::Yes, const Receiver, Slot>(slotTable, findMetaSignal(name), &receiver, std::forward<Slot>(slot)); }
 
     /** @brief Register a slot into an owned signal using a raw signal (may take a custom SlotTable if needed)
      *  Be careful, if you pass a custom SlotTable, you will have to disconnect it manually
@@ -335,9 +356,9 @@ public:
     bool disconnect(Meta::SlotTable &slotTable)
         { return disconnect(slotTable, getMetaType().findSignal<SignalPtr>()); }
     bool disconnect(const HashedName name)
-        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name)); }
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), findMetaSignal(name)); }
     bool disconnect(Meta::SlotTable &slotTable, const HashedName name)
-        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name)); }
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), findMetaSignal(name)); }
     bool disconnect(const Meta::Signal signal)
         { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), signal); }
     bool disconnect(Meta::SlotTable &slotTable, const Meta::Signal signal);
@@ -352,9 +373,9 @@ public:
 
     /** @brief Disconnect a slot using a signal name and a connection handle (may take custom SlotTable) */
     bool disconnect(const HashedName name, const ConnectionHandle handle)
-        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), getMetaType().findSignal(name), handle); }
+        { return disconnect(getDefaultSlotTable<IsEnsureCache::No>(), findMetaSignal(name), handle); }
     bool disconnect(Meta::SlotTable &slotTable, const HashedName name, const ConnectionHandle handle)
-        { return disconnect(slotTable, getMetaType().findSignal(name), handle); }
+        { return disconnect(slotTable, findMetaSignal(name), handle); }
 
     /** @brief Disconnect a slot using a signal and a connection handle (may take custom SlotTable) */
     bool disconnect(const Meta::Signal signal, const ConnectionHandle handle)
@@ -372,10 +393,10 @@ public:
     /** @brief Disconnect a slot using a signal name, a receiver and a connection handle (may take custom SlotTable) */
     template<typename Receiver>
     bool disconnect(const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
-        { return disconnect<Receiver>(getDefaultSlotTable(), getMetaType().findSignal(name), &receiver, handle); }
+        { return disconnect<Receiver>(getDefaultSlotTable(), findMetaSignal(name), &receiver, handle); }
     template<typename Receiver>
     bool disconnect(Meta::SlotTable &slotTable, const HashedName name, const Receiver &receiver, const ConnectionHandle handle)
-        { return disconnect<Receiver>(slotTable, getMetaType().findSignal(name), &receiver, handle); }
+        { return disconnect<Receiver>(slotTable, findMetaSignal(name), &receiver, handle); }
 
     /** @brief Disconnect a slot using a signal, a receiver and a connection handle (may take custom SlotTable) */
     template<typename Receiver>
@@ -394,7 +415,7 @@ public:
     /** @brief Emit signal matching 'name' using default slot table */
     template<typename ...Args>
     void emitSignal(const HashedName name, Args &&...args)
-        { emitSignal<IsEnsureCache::No, Args...>(getDefaultSlotTable(), getMetaType().findSignal(name), std::forward<Args>(args)...); }
+        { emitSignal<IsEnsureCache::No, Args...>(getDefaultSlotTable(), findMetaSignal(name), std::forward<Args>(args)...); }
 
     /** @brief Emit a signal using default slot table */
     template<typename ...Args>
@@ -409,7 +430,7 @@ public:
     /** @brief Emit signal matching 'name' using a specific slot table */
     template<typename ...Args>
     void emitSignal(Meta::SlotTable &slotTable, const HashedName name, Args &&...args)
-        { emitSignal<IsEnsureCache::Yes, Args...>(slotTable, getMetaType().findSignal(name), std::forward<Args>(args)...); }
+        { emitSignal<IsEnsureCache::Yes, Args...>(slotTable, findMetaSignal(name), std::forward<Args>(args)...); }
 
     /** @brief Emit a signal using a specific slot table */
     template<typename ...Args>
@@ -455,7 +476,7 @@ private:
     std::unique_ptr<Cache> _cache {};
 
     /** @brief Ensure that object has a connection table */
-    void ensureCache(void) noexcept_ndebug;
+    void ensureObjectCache(void) noexcept_ndebug;
 
     /** @brief Connection implementation */
     template<IsEnsureCache EnsureCache, typename Receiver, typename Slot>

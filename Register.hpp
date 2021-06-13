@@ -117,7 +117,8 @@ private: \
 
 /** @brief Register a custom property using getter, copy setter, move setter and a signal */
 #define KUBE_REGISTER_PROPERTY_CUSTOM(PropertyType, name, getter, copySetter, moveSetter) \
-    .template data<getter, copySetter, moveSetter, &_MetaType::name##Changed>(kF::Hash(#name), kF::Hash(_STRINGIFY(name##Changed)))
+    .template data<getter, copySetter, moveSetter, &_MetaType::name##Changed>(kF::Hash(#name)) \
+    KUBE_REGISTER_SIGNAL(name##Changed)
 
 /** @brief Register a custom property using getter, copy setter and move setter (no signal) */
 #define KUBE_REGISTER_PROPERTY_CUSTOM_SIGLESS(PropertyType, name, getter, copySetter, moveSetter) \
